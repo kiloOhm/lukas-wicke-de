@@ -2,5 +2,3 @@
 	import type { PageProps } from './$types';
 	const { data, params } = $props() as PageProps;
 </script>
-
-<section></section>

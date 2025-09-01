@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
+	import Button from '$lib/components/ui/button/button.svelte';
 
 	const { data, params } = $props() as PageProps;
 </script>
@@ -52,6 +53,6 @@
 	</article>
 
 	<footer>
-		<button>DOWNLOAD ALL</button>
+		<Button>DOWNLOAD ALL</Button>
 	</footer>
 </section>

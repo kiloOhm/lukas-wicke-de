@@ -1,10 +1,6 @@
 <script lang="ts">
 	const images: [string, string][] = [
 		[
-			'little girl in red dress sticker',
-			'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/64d6da33-438d-4127-1dbd-7155fbd75f00/public'
-		],
-		[
 			'red ropes',
 			'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/b436f869-88d7-422d-d450-e7246ff41d00/public'
 		],
@@ -15,6 +11,10 @@
 		[
 			'bronze woman stature',
 			'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/df0aae74-56c4-4c03-fac7-e6a2f678ef00/public'
+		],
+		[
+			'little girl in red dress sticker',
+			'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/64d6da33-438d-4127-1dbd-7155fbd75f00/public'
 		],
 		[
 			'Colorful Rocks',
