@@ -1,0 +1,8 @@
+{
+	"files.associations": {
+		"wrangler.json": "jsonc"
+	},
+	"css.lint.unknownAtRules": "ignore",
+	"less.lint.unknownAtRules": "ignore",
+	"scss.lint.unknownAtRules": "ignore"
+}
