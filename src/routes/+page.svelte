@@ -35,6 +35,7 @@
 <section
 	aria-label="Photo gallery"
 	class="
+		-mb-3
 		columns-1
 		gap-x-4
 		supports-[grid-template-rows:masonry]:grid

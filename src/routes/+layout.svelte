@@ -10,7 +10,7 @@
 <Toaster />
 
 <div class="app">
-	<main class="p-8 lg:p-12">
+	<main class="mx-auto max-w-6xl p-4 py-8">
 		{@render children()}
 	</main>
 </div>
