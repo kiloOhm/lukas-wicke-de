@@ -1,10 +1,6 @@
 <script lang="ts">
 	const images: [string, string][] = [
 		[
-			'Dog with tongue out',
-			'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/f9ce482b-0b7a-4c9a-f321-895da75f5800/public'
-		],
-		[
 			'little girl in red dress sticker',
 			'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/64d6da33-438d-4127-1dbd-7155fbd75f00/public'
 		],
