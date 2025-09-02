@@ -8,7 +8,7 @@
 <section class="flex w-full flex-grow items-center justify-center">
 	<Card.Root class="max-w-md flex-grow">
 		<Card.Content>
-			<form action="?/login" method="POST" use:enhance class="flex flex-col gap-2">
+			<form action="?/auth" method="POST" use:enhance class="flex flex-col gap-2">
 				<div>
 					<Input name="password" placeholder="Password" type="password" />
 				</div>

@@ -1,36 +1,54 @@
 <script lang="ts">
 	import Gallery from '$lib/components/ui/gallery.svelte';
-	import type { CollectionInfo, ImageInfo } from '../types';
+	import type { GalleryItemInfo } from '../types';
 	import { m } from '$lib/paraglide/messages';
 
-	const rootImages: ImageInfo[] = [
+	const { data } = $props();
+
+	const rootImages: GalleryItemInfo[] = [
 		{
 			title: m.contact(),
 			href: 'https://www.instagram.com/lukasdabbelju/',
 			alt: 'Photographer in Reflection',
+			id: '9f15afec-920f-4385-e8e2-088144713e00',
 			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/9f15afec-920f-4385-e8e2-088144713e00/public'
 		},
 		{
 			alt: 'Bridge under dark clouds',
+			id: '8fc8c582-f9bc-4b78-c3ef-6a5512c73400',
 			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/8fc8c582-f9bc-4b78-c3ef-6a5512c73400/public'
 		},
 		{
 			alt: 'bronze woman stature',
+			id: 'df0aae74-56c4-4c03-fac7-e6a2f678ef00',
 			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/df0aae74-56c4-4c03-fac7-e6a2f678ef00/public'
 		},
 		{
 			alt: 'little girl in red dress sticker',
+			id: '64d6da33-438d-4127-1dbd-7155fbd75f00',
 			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/64d6da33-438d-4127-1dbd-7155fbd75f00/public'
 		},
 		{
 			alt: 'Colorful Rocks',
+			id: '59ffa716-d204-46c7-4901-5a4e077ea000',
 			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/59ffa716-d204-46c7-4901-5a4e077ea000/public'
 		},
 		{
-			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/b436f869-88d7-422d-d450-e7246ff41d00/public',
-			alt: 'red ropes'
+			alt: 'red ropes',
+			id: 'b436f869-88d7-422d-d450-e7246ff41d00',
+			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/b436f869-88d7-422d-d450-e7246ff41d00/public'
 		}
 	];
+
+	if (data.authenticated) {
+		rootImages.push({
+			title: 'ADMIN',
+			href: '/admin',
+			alt: 'Bridge under dark clouds',
+			id: '8fc8c582-f9bc-4b78-c3ef-6a5512c73400',
+			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/8fc8c582-f9bc-4b78-c3ef-6a5512c73400/public'
+		});
+	}
 </script>
 
 <svelte:head>

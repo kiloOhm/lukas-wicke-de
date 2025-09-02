@@ -2,17 +2,15 @@ import { error, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import type { CollectionInfo } from '../../../../types';
 
-
 export const actions = {
   auth: async ({request, cookies, platform, params}) => {
-    const collection = await platform?.env.KV.get<CollectionInfo>('c:' + params.collection, { type: 'json' });
+    if(!platform) {
+      return error(500, "Platform not available");
+    }
+    const collections = await platform.env.KV.get<CollectionInfo[]>("collections", { type: 'json' });
+    const collection = collections?.find(c => c.name.toLowerCase() === params.collection.toLowerCase());
     if(!collection) {
       return error(404, "Collection not found")
-    }
-    const cookieAuth = cookies.get('auth');
-    const authenticated = collection?.password === cookieAuth;
-    if (authenticated) {
-      return redirect(302, '/c/' + collection.name);
     }
     const data = await request.formData();
     const password = data.get('password');
@@ -21,8 +19,8 @@ export const actions = {
       throw new Error('No password provided');
     }
     if (collection?.password === passwordString) {
-      cookies.set('auth:' + params.collection, passwordString, {
-        path: '/c/' + collection.name,
+      cookies.set('auth_' + collection.name, passwordString, {
+        path: '/',
       });
       return redirect(302, '/c/' + collection.name);
     }

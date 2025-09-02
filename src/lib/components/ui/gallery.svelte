@@ -1,9 +1,13 @@
 <script lang="ts">
-	import type { ImageInfo } from '../../../types';
-	const { images }: { images: ImageInfo[] } = $props();
+	import type { Snippet } from 'svelte';
+	import type { GalleryItemInfo } from '../../../types';
+	const {
+		images,
+		extra
+	}: { images: GalleryItemInfo[]; extra?: Snippet<[{ info: GalleryItemInfo }]> } = $props();
 </script>
 
-{#snippet figure({ src, alt, title, href }: ImageInfo)}
+{#snippet figure({ src, alt, title, href, id }: GalleryItemInfo)}
 	<figure
 		class={`
 				[container-type:inline-size] relative mb-4
@@ -20,13 +24,18 @@
 			decoding="async"
 			class={`block h-auto w-full ${href ? 'transition-transform duration-500 hover:scale-115' : ''}`}
 		/>
+		{#if extra}
+			<div class="absolute inset-0 p-4">
+				{@render extra({ info: { src, alt, title, href, id } })}
+			</div>
+		{/if}
 		{#if title}
 			<figcaption class="pointer-events-none absolute inset-0">
 				<!-- 1) Blur layer, revealed by a vertical gradient mask -->
 				<div
 					class="
 						absolute inset-0 [mask-image:linear-gradient(to_top,black_30%,transparent)]
-						backdrop-blur-sm
+						backdrop-blur-xs
 						[-webkit-mask-image:linear-gradient(to_top,black_30%,transparent)]
 					"
 				></div>
@@ -41,7 +50,7 @@
 						x="0"
 						y="100%"
 						dominant-baseline="ideographic"
-						textLength="90%"
+						textLength="80%"
 						lengthAdjust="spacingAndGlyphs"
 						class="fill-white/30 [font-size:8rem] font-[700]"
 					>

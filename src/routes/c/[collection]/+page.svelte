@@ -11,9 +11,5 @@
 </svelte:head>
 
 <section>
-	<header>
-		<h1>{data.name}</h1>
-	</header>
-
 	<Gallery images={data.images} />
 </section>

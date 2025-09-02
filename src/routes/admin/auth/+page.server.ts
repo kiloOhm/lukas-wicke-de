@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
+import { isAuthenticated } from '../../../server/auth.service';
 
 
 export const actions = {
@@ -8,8 +9,10 @@ export const actions = {
       platform?.env.KV.put('auth', JSON.stringify(['dev-password']));
     }
     const kvAuth = await platform?.env.KV.get<string[]>('auth', { type: 'json' });
-    const cookieAuth = cookies.get('auth');
-    const authenticated = kvAuth?.includes(cookieAuth ?? '') ?? false;
+    if(!platform) {
+      throw new Error('Platform not available');
+    }
+    const authenticated = await isAuthenticated(platform, cookies)
     if (authenticated) {
       return redirect(302, '/admin');
     }
@@ -21,7 +24,7 @@ export const actions = {
     }
     if (kvAuth?.includes(passwordString ?? '') ?? false) {
       cookies.set('auth', passwordString, {
-        path: '/admin',
+        path: '/',
       });
       return redirect(302, '/admin');
     }

@@ -33,5 +33,12 @@
 			"id": "7850feb3348347f2901b3ee03c9dac51",
 			"preview_id": "feeeeaada15546fd9630ef93ef16a263"
 		}
-	]
+	],
+	"vars": {
+		"CF_IMAGES_ACCOUNT_ID": "bc479fff0ed21d18a613d71c1af79682",
+		"CF_IMAGES_ACCOUNT_HASH": "k1HQsavJfzZQlI3O3ZBS7Q"
+	},
+	"ai": {
+		"binding": "AI"
+	}
 }
