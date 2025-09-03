@@ -1,7 +1,7 @@
 import { error, redirect, type Actions, type RequestEvent } from '@sveltejs/kit';
 import { isAuthenticated } from '../../../server/auth.service';
 import type { PageServerLoad } from './$types';
-import type { CollectionInfo } from '../../../types';
+import type { CollectionInfo, ImageInfo } from '../../../types';
 import { useCloudflareImagesService } from '../../../server/cloudflare.service';
 import type { GalleryItemInfo } from '../../../types';
 
@@ -38,28 +38,28 @@ export const actions = {
   async upload(event) {
     const {request} = event;
     const {collection, collections, platform} = await validateRequest(event);
-    const { uploadImage } = useCloudflareImagesService(platform);
+    const { uploadImage, getBatchToken } = useCloudflareImagesService(platform);
     const fd = await request.formData();
-    const file = fd.get('file');
-    if (!(file instanceof Blob)) {
-      return error(400, "File is required");
+    const files = fd.getAll('files');
+    if(!files?.length) {
+      return error(400, "Files are required");
     }
-    const [uploadResult, aiResult] = await Promise.allSettled([
-      uploadImage(file),
-      (platform.env.AI?.run('@cf/microsoft/resnet-50', {
-        image: [...await file.bytes()]
-      }) ?? Promise.resolve(null))
-    ]);
-    if(uploadResult.status === 'rejected') {
-      return error(500, uploadResult.reason instanceof Error ? uploadResult.reason.message : 'Unknown error');
+    const batchToken = files.length === 1 ? undefined : (await getBatchToken()).token;
+    const uploadResults = await Promise.allSettled(files.filter(f => f instanceof File).map(f => uploadImage(f, batchToken)));
+    const uploaded: number = uploadResults.filter(r => r.status === 'fulfilled').length;
+    const errors: string[] = [];
+    if(uploadResults.some(r => r.status === 'rejected')) {
+      errors.push(...uploadResults.filter(r => r.status === 'rejected').map(r => r.reason instanceof Error ? r.reason.message : 'Unknown error'));
     }
-    let alt = "";
-    if(aiResult.status === 'fulfilled') {
-      alt = aiResult.value[0].label?.toLocaleLowerCase() ?? "";
-    }
-    collection.images.push({ id: uploadResult.value.id, alt });
+    collection.images.push(...(uploadResults.map(r => r.status === 'fulfilled' ? { id: r.value.id, alt: r.value.id } : null).filter(Boolean) as ImageInfo[]));
     collections.splice(collections.findIndex(c => c.name === collection.name), 1, collection);
     await platform?.env.KV.put('collections', JSON.stringify(collections));
+    if (errors.length) {
+      return {
+        uploaded,
+        errors
+      }
+    }
   },
   async delete(event) {
     const { request } = event;
@@ -70,7 +70,9 @@ export const actions = {
       return error(400, "Image ID is required");
     }
     const { deleteImage } = useCloudflareImagesService(platform);
-    await deleteImage(id);
+    try {
+      await deleteImage(id);
+    } catch {}
     collection.images = collection.images.filter(img => img.id !== id);
     collections.splice(collections.findIndex(c => c.name === collection.name), 1, collection);
     await platform?.env.KV.put('collections', JSON.stringify(collections));

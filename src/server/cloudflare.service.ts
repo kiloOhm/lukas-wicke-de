@@ -8,24 +8,47 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
       }
       return await generateSignedUrl(new URL(`https://imagedelivery.net/${accountHash}/${imgId}/${variant}`), apiKey);
     },
-    async uploadImage(file: File) {
-      const accountId = platform.env.CF_IMAGES_ACCOUNT_ID;
+    async getBatchToken() {
+      const accountId = platform.env.CF_IMAGES_ACCOUNT_ID ?? import.meta.env.CF_IMAGES_ACCOUNT_ID;
       if (!accountId) {
         throw new Error('Missing Cloudflare Images account ID');
       }
       const apiKey = platform.env.CF_API_TOKEN ?? import.meta.env.CF_API_TOKEN;
       if (!apiKey) {
-        throw new Error('Missing Cloudflare Images API token');
+        throw new Error('Missing Cloudflare API token');
       }
-      const API_URL = `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1`;
-      const TOKEN = apiKey;
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1/batch_token`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+      if (!res.ok) {
+        throw new Error('Failed to get batch token: ' + await res.text());
+      }
+      const data = await res.json() as { result: { token: string, expiresAt: string } };
+      return {
+        token: data.result.token,
+        expiresAt: new Date(data.result.expiresAt)
+      };
+    },
+    async uploadImage(file: File, batchToken?: string) {
+      const accountId = platform.env.CF_IMAGES_ACCOUNT_ID;
+      if (!accountId) {
+        throw new Error('Missing Cloudflare Images account ID');
+      }
+      const auth = batchToken ?? platform.env.CF_API_TOKEN ?? import.meta.env.CF_API_TOKEN;
+      if (!auth) {
+        throw new Error('Missing auth');
+      }
+      const API_URL = batchToken ? 'https://batch.imagedelivery.net/images/v1' : `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1`;
       const formData = new FormData();
       formData.append('file', file);
       formData.append('requireSignedURLs', 'true');
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${TOKEN}`,
+          'Authorization': `Bearer ${auth}`,
         },
         body: formData,
       });
@@ -38,6 +61,23 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
         }
       };
       return data.result;
+    },
+    exportImage(id: string) {
+      const accountId = platform.env.CF_IMAGES_ACCOUNT_ID ?? import.meta.env.CF_IMAGES_ACCOUNT_ID;
+      if (!accountId) {
+        throw new Error('Missing Cloudflare Images account ID');
+      }
+      const apiKey = platform.env.CF_API_TOKEN ?? import.meta.env.CF_API_TOKEN;
+      if (!apiKey) {
+        throw new Error('Missing Cloudflare Images API token');
+      }
+      const requestUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1/${id}/blob`;
+      return fetch(requestUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
     },
     async deleteImage(id: string) {
       const accountId = platform.env.CF_IMAGES_ACCOUNT_ID;

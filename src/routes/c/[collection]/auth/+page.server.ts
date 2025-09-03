@@ -22,7 +22,7 @@ export const actions = {
       cookies.set('auth_' + collection.name, passwordString, {
         path: '/',
       });
-      return redirect(302, '/c/' + collection.name);
+      return redirect(302, '/c/' + collection.name.toLowerCase());
     }
     return error(401, 'Invalid password');
   }

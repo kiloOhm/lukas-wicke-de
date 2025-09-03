@@ -41,7 +41,7 @@
 	];
 
 	if (data.authenticated) {
-		rootImages.push({
+		rootImages.unshift({
 			title: 'ADMIN',
 			href: '/admin',
 			alt: 'Bridge under dark clouds',
