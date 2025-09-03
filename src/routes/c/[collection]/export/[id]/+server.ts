@@ -4,7 +4,6 @@ import type { CollectionInfo } from '../../../../../types';
 import { useCloudflareImagesService } from '../../../../../server/cloudflare.service';
 
 export const GET: RequestHandler = async ({ params, cookies, platform, url }) => {
-  console.log({ params })
   if (!platform) {
     return error(500, "Platform not available");
   }
