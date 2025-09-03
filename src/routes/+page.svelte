@@ -19,6 +19,11 @@
 			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/8fc8c582-f9bc-4b78-c3ef-6a5512c73400/public'
 		},
 		{
+			alt: 'candy',
+			id: '5e3020f1-8a3a-4fc9-fb42-78b4de8c8901',
+			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/5e3020f1-8a3a-4fc9-fb42-78b4de8c8901/public'
+		},
+		{
 			alt: 'bronze woman stature',
 			id: 'df0aae74-56c4-4c03-fac7-e6a2f678ef00',
 			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/df0aae74-56c4-4c03-fac7-e6a2f678ef00/public'
@@ -37,6 +42,11 @@
 			alt: 'red ropes',
 			id: 'b436f869-88d7-422d-d450-e7246ff41d00',
 			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/b436f869-88d7-422d-d450-e7246ff41d00/public'
+		},
+		{
+			alt: 'colorful skulls in a row',
+			id: '4c87dc53-9c79-495c-938d-ade3d5361c01',
+			src: 'https://imagedelivery.net/k1HQsavJfzZQlI3O3ZBS7Q/4c87dc53-9c79-495c-938d-ade3d5361c01/public'
 		}
 	];
 
