@@ -1,5 +1,27 @@
 export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
   return {
+    async getImageDetails(id: string) {
+      const accountId = platform.env.CF_IMAGES_ACCOUNT_ID ?? import.meta.env.CF_IMAGES_ACCOUNT_ID;
+      if (!accountId) {
+        throw new Error('Missing Cloudflare Images account ID');
+      }
+      const apiKey = platform.env.CF_API_TOKEN ?? import.meta.env.CF_API_TOKEN;
+      if (!apiKey) {
+        throw new Error('Missing Cloudflare API token');
+      }
+      const res = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1/${id}`,
+        { headers: { Authorization: `Bearer ${apiKey}` } }
+      );
+      if (!res.ok) {
+        throw new Error(`CF Images details failed: ${res.status} ${await res.text()}`);
+      }
+      const json = await res.json() as {
+        success: boolean;
+        result: { id: string; width: number; height: number };
+      };
+      return json.result;
+    },
     async getSignedUrl(imgId: string, variant: 'private4k' | 'public' | 'thumb' | 'private1440') {
       const accountHash = platform.env.CF_IMAGES_ACCOUNT_HASH ?? import.meta.env.CF_IMAGES_ACCOUNT_HASH;
       const apiKey = platform.env.CF_IMAGES_API_TOKEN ?? import.meta.env.CF_IMAGES_API_TOKEN;
@@ -79,7 +101,7 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
         },
       });
     },
-    async deleteImage(id: string) {
+    async deleteImage(id: string, batchToken?: string) {
       const accountId = platform.env.CF_IMAGES_ACCOUNT_ID;
       if (!accountId) {
         throw new Error('Missing Cloudflare Images account ID');
@@ -88,14 +110,26 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
       if (!apiKey) {
         throw new Error('Missing Cloudflare Images API token');
       }
-      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-      });
-      if (!res.ok) {
-        throw new Error('Failed to delete image: ' + await res.text());
+      if(batchToken) {
+        const res = await fetch(`https://batch.imagedelivery.net/images/v1/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${batchToken}`,
+          },
+        });
+        if (!res.ok) {
+          throw new Error('Failed to delete image: ' + await res.text());
+        }
+      } else {
+        const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+          },
+        });
+        if (!res.ok) {
+          throw new Error('Failed to delete image: ' + await res.text());
+        }
       }
     },
     async getDirectUploadUrl() {
@@ -103,7 +137,8 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
       if (!accountId) {
         throw new Error('Missing Cloudflare Images account ID');
       }
-      const apiKey = platform.env.CF_IMAGES_API_TOKEN ?? import.meta.env.CF_IMAGES_API_TOKEN;
+      // const apiKey = platform.env.CF_IMAGES_API_TOKEN ?? import.meta.env.CF_IMAGES_API_TOKEN;
+      const apiKey = platform.env.CF_API_TOKEN ?? import.meta.env.CF_API_TOKEN;
       if (!apiKey) {
         throw new Error('Missing Cloudflare Images API token');
       }
@@ -118,7 +153,7 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
         body: fd
       });
       if(!res.ok) {
-        throw new Error('Failed to get direct upload URL');
+        throw new Error('Failed to get direct upload URL: ' + await res.text());
       }
       const data = await res.json() as {
         result: {
@@ -127,7 +162,7 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
         };
       };
       return data.result;
-    }
+    },
   }
 }
 

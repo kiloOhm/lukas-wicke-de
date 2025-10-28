@@ -1,9 +1,9 @@
-import { error, redirect, type Actions, type RequestEvent } from '@sveltejs/kit';
-import { isAuthenticated } from '../../../server/auth.service';
+import { error, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { CollectionInfo, ImageInfo } from '../../../types';
+import type { ImageInfo } from '../../../types';
 import { useCloudflareImagesService } from '../../../server/cloudflare.service';
 import type { GalleryItemInfo } from '../../../types';
+import { validateRequest } from './common';
 
 export const load: PageServerLoad = async (event) => {
   const {collection, platform} = await validateRequest(event);
@@ -13,7 +13,9 @@ export const load: PageServerLoad = async (event) => {
     images: await Promise.all(collection.images.map(async (img) => ({
       src: (await getSignedUrl(img.id, 'private1440')).href,
       alt: img.alt,
-      id: img.id
+      id: img.id,
+      width: img.width,
+      height: img.height
     } as GalleryItemInfo)))
   };
 };
@@ -79,33 +81,33 @@ export const actions = {
   },
   async deleteCollection(event) {
     let { collection, collections, platform } = await validateRequest(event);
+    const { deleteImage, getBatchToken } = useCloudflareImagesService(platform);
+    const batchToken = (await getBatchToken()).token;
+    const ids = collection.images.map((img) => img.id);
+    const CONCURRENCY = 5;
+    let idx = 0;
+    const failed: string[] = [];
+      // worker pool
+    const worker = async () => {
+      while (idx < ids.length) {
+        const current = ids[idx++];
+        try {
+          await deleteImage(current, batchToken);
+        } catch (e) {
+          failed.push(current);
+        }
+      }
+    };
+    const workers: Promise<void>[] = [];
+    for (let i = 0; i < Math.min(CONCURRENCY, ids.length); i++) {
+      workers.push(worker());
+    }
+    await Promise.all(workers);
+
+    console.log(`Failed to delete ${failed.length} images.`);
+
     collections = collections.filter(c => c.name !== collection.name);
     await platform?.env.KV.put('collections', JSON.stringify(collections));
     return redirect(302, '/admin');
-  }
+  },
 } satisfies Actions;
-
-//#region helpers
-
-async function validateRequest({ platform, cookies, params }: RequestEvent<{
-    collection?: string;
-}>) {
-      if(!platform) {
-      throw new Error('Platform not available');
-    }
-    if(!params.collection) {
-      throw new Error('Collection not specified');
-    }
-    const authenticated = await isAuthenticated(platform, cookies);
-    if (!authenticated) {
-      return redirect(302, '/admin/auth');
-    }
-    const collections = await platform?.env.KV.get<CollectionInfo[]>('collections', { type: 'json' }) ?? [];
-    const collection = collections.find(c => c.name.toLowerCase() === params.collection!.toLowerCase());
-    if (!collection) {
-      return error(404, 'Collection not found');
-    }
-    return { collections, collection, platform };
-}
-
-//#endregion helpers

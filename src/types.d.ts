@@ -4,11 +4,15 @@ export type GalleryItemInfo = {
   alt: string,
   title?: string,
   href?: string
+  width?: number,
+  height?: number
 }
 
 export type ImageInfo = {
   id: string,
-  alt: string
+  alt: string,
+  width?: number,
+  height?: number
 }
 
 export type CollectionInfo = {

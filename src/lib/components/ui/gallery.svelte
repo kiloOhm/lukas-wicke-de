@@ -7,59 +7,46 @@
 	}: { images: GalleryItemInfo[]; extra?: Snippet<[{ info: GalleryItemInfo }]> } = $props();
 </script>
 
-{#snippet figure({ src, alt, title, href, id }: GalleryItemInfo)}
-	<figure
-		class={`
-				[container-type:inline-size] relative mb-4
-				break-inside-avoid overflow-hidden
-				rounded-sm [contain-intrinsic-size:300px_200px] [content-visibility:auto]
-				supports-[grid-template-rows:masonry]:mb-0
-				${href ? 'transition-transform duration-500 hover:scale-102' : ''}
-			`}
-	>
-		<img
-			{src}
-			{alt}
-			loading="lazy"
-			decoding="async"
-			class={`block h-auto w-full ${href ? 'transition-transform duration-500 hover:scale-115' : ''}`}
-		/>
-		{#if extra}
-			<div class="absolute inset-0 p-4">
-				{@render extra({ info: { src, alt, title, href, id } })}
-			</div>
-		{/if}
-		{#if title}
-			<figcaption class="pointer-events-none absolute inset-0">
-				<!-- 1) Blur layer, revealed by a vertical gradient mask -->
-				<div
-					class="
-						absolute inset-0 [mask-image:linear-gradient(to_top,black_30%,transparent)]
-						backdrop-blur-xs
-						[-webkit-mask-image:linear-gradient(to_top,black_30%,transparent)]
-					"
-				></div>
+{#snippet figure({ src, alt, title, href, id, width, height }: GalleryItemInfo)}
+  <figure
+    class="
+      [container-type:inline-size] relative mb-4
+      break-inside-avoid overflow-hidden rounded-sm
+      supports-[grid-template-rows:masonry]:mb-0
+      {href ? 'transition-transform duration-500 hover:scale-102' : ''}
+    "
+    style={`aspect-ratio:${width}/${height}`}
+  >
+    <img
+      {src}
+      {alt}
+      {width}
+      {height}
+      loading="lazy"
+      decoding="async"
+      fetchpriority="low"
+      class={`block h-auto w-full ${href ? 'transition-transform duration-500 hover:scale-115' : ''}`}
+      style="aspect-ratio:inherit; object-fit:cover;"
+    />
+    {#if extra}
+      <div class="absolute inset-0 p-4">
+        {@render extra({ info: { src, alt, title, href, id, width, height } })}
+      </div>
+    {/if}
 
-				<!-- 2) Optional color tint on top of the blur -->
-				<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-
-				<!-- 3) Accessible text + your visual SVG title -->
-				<span class="sr-only">{title}</span>
-				<svg aria-hidden="true" class="absolute inset-x-0 -bottom-[1.7rem] h-[8rem] w-full">
-					<text
-						x="0"
-						y="100%"
-						dominant-baseline="ideographic"
-						textLength="80%"
-						lengthAdjust="spacingAndGlyphs"
-						class="fill-white/30 [font-size:8rem] font-[700]"
-					>
-						{title}
-					</text>
-				</svg>
-			</figcaption>
-		{/if}
-	</figure>
+    {#if title}
+      <figcaption class="pointer-events-none absolute inset-0">
+        <div class="absolute inset-0 [mask-image:linear-gradient(to_top,black_30%,transparent)] backdrop-blur-xs [-webkit-mask-image:linear-gradient(to_top,black_30%,transparent)]"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+        <span class="sr-only">{title}</span>
+        <svg aria-hidden="true" class="absolute inset-x-0 -bottom-[1.7rem] h-[8rem] w-full">
+          <text x="0" y="100%" dominant-baseline="ideographic" textLength="80%" lengthAdjust="spacingAndGlyphs" class="fill-white/30 [font-size:8rem] font-[700]">
+            {title}
+          </text>
+        </svg>
+      </figcaption>
+    {/if}
+  </figure>
 {/snippet}
 
 <article
