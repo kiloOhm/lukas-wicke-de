@@ -109,5 +109,5 @@ export const actions = {
     collections = collections.filter(c => c.name !== collection.name);
     await platform?.env.KV.put('collections', JSON.stringify(collections));
     return redirect(302, '/admin');
-  },
+  }
 } satisfies Actions;

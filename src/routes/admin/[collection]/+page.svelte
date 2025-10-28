@@ -222,6 +222,101 @@
 			URL.revokeObjectURL(url);
 		}
 	}
+
+	let remeasuring = $state(false);
+	let remeasureMap = $state<
+		Record<string, { loaded: number; total: number; status: 'measuring' | 'saving' | 'done' | 'error' }>
+	>({});
+	async function remeasureAll() {
+		remeasuring = true;
+		remeasureMap = {};
+
+		// Use the already-loaded list with signed URLs
+		const items = [...data.images] as Array<Pick<GalleryItemInfo, 'id' | 'src'>>;
+
+		const measureOne = async (id: string, url: string) => {
+			remeasureMap[id] = { loaded: 0, total: 1, status: 'measuring' };
+
+			try {
+				// Fetch as blob so we can EXIF-correct via createImageBitmap
+				const res = await fetch(url, { credentials: 'omit' });
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const blob = await res.blob();
+
+				let width: number, height: number;
+
+				if ('createImageBitmap' in window) {
+					const bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' as const });
+					width = bmp.width;
+					height = bmp.height;
+					bmp.close?.();
+				} else {
+					// Fallback: may ignore EXIF in some browsers
+					const objectUrl = URL.createObjectURL(blob);
+					try {
+						({ width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+							const img = new Image();
+							img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+							img.onerror = reject;
+							img.src = objectUrl;
+						}));
+					} finally {
+						URL.revokeObjectURL(objectUrl);
+					}
+				}
+
+				remeasureMap[id].loaded = 1;    // show 100%
+				remeasureMap[id].status = 'saving';
+				return { id, width, height };
+			} catch (e) {
+				remeasureMap[id].status = 'error';
+				return null;
+			}
+		};
+
+		// Throttle measurements (avoid hammering)
+		const CONCURRENCY = 6;
+		let idx = 0;
+		const measured: Array<{ id: string; width: number; height: number }> = [];
+
+		const worker = async () => {
+			while (idx < items.length) {
+				const { id, src } = items[idx++];
+				const m = await measureOne(id, src);
+				if (m) measured.push(m);
+			}
+		};
+
+		const workers = Array.from({ length: Math.min(CONCURRENCY, items.length) }, worker);
+		await Promise.all(workers);
+
+		// Save results in one request
+		if (measured.length) {
+			const fd = new FormData();
+			fd.append('items', JSON.stringify(measured));
+			const res = await fetch(`./${data.collection.name.toLowerCase()}/remeasure`, {
+				method: 'POST',
+				body: fd
+			});
+			if (!res.ok) {
+				// mark all saving as error
+				for (const m of measured) remeasureMap[m.id].status = 'error';
+				toast.error('Failed to save new dimensions', { position: 'top-left' });
+			} else {
+				const { updated, skipped } = await res.json() as { updated: number; skipped: number };
+				for (const m of measured) {
+					remeasureMap[m.id].status = 'done';
+				}
+				toast.success(`Re-measured ${updated}${skipped ? `, skipped ${skipped}` : ''}.`, { position: 'top-left' });
+				// Refresh the page so Gallery gets the new width/height
+				location.reload();
+			}
+		} else {
+			toast.message('No images could be measured.', { position: 'top-left' });
+		}
+
+		remeasuring = false;
+	}
 </script>
 
 <section class="flex flex-col gap-4">
@@ -231,6 +326,30 @@
 		</Button>
 		<h1 class="text-xl font-semibold">{data.collection.name}</h1>
 		<div class="flex items-center gap-2">
+			<Button class="cursor-pointer" variant="outline" onclick={remeasureAll}>
+				Re-measure
+			</Button>
+			<Dialog.Root bind:open={remeasuring}>
+				<Dialog.Content>
+					<Dialog.Header>
+						<Dialog.Title>Re-measuring images</Dialog.Title>
+					</Dialog.Header>
+					<div class="flex flex-col gap-2">
+						{#each Object.entries(remeasureMap) as [id, p]}
+							<div class="flex items-center gap-3">
+								<div class="w-40 truncate">{id}</div>
+								<div class="h-2 flex-1 rounded bg-gray-200">
+									<div class="h-2 rounded" style={`width:${p.total ? ((p.loaded / p.total) * 100).toFixed(1) : 0}%`}></div>
+								</div>
+								<div class="w-24 text-sm capitalize">{p.status}</div>
+								{#if p.status === 'measuring' || p.status === 'saving'}
+									<Loader2Icon class="animate-spin" />
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</Dialog.Content>
+			</Dialog.Root>
 			<Button class="cursor-pointer" onclick={pickFiles}>
 				{#if uploading}
 					<div class="contents" transition:fade>
