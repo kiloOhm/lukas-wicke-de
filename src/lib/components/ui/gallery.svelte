@@ -7,27 +7,28 @@
 	}: { images: GalleryItemInfo[]; extra?: Snippet<[{ info: GalleryItemInfo }]> } = $props();
 </script>
 
-{#snippet figure({ src, alt, title, href, id, width, height }: GalleryItemInfo)}
+{#snippet figure({ src, alt, title, href, id, width, height }: GalleryItemInfo, eager = false)}
   <figure
     class="
       [container-type:inline-size] relative mb-4
       break-inside-avoid overflow-hidden rounded-sm
       supports-[grid-template-rows:masonry]:mb-0
-      {href ? 'transition-transform duration-500 hover:scale-102' : ''}
+      {href ? 'transition-transform duration-250 hover:scale-[1.01]' : ''}
     "
-    style={`aspect-ratio:${width}/${height}`}
+    style={`aspect-ratio:${width}/${height}; content-visibility:auto; contain-intrinsic-size:${Math.round(width ?? 0)}px ${Math.round(height ?? 0)}px;`}
   >
     <img
-      {src}
-      {alt}
-      {width}
-      {height}
-      loading="lazy"
+      src={src}
+      alt={alt} 
+      width={width}
+      height={height}
+      loading={eager ? 'eager' : 'lazy'}
       decoding="async"
-      fetchpriority="low"
-      class={`block h-auto w-full ${href ? 'transition-transform duration-500 hover:scale-115' : ''}`}
+      fetchpriority={eager ? 'high' : undefined}
+      class={`block h-auto w-full ${href ? 'transition-transform duration-250 hover:scale-[1.01]' : ''}`}
       style="aspect-ratio:inherit; object-fit:cover;"
     />
+
     {#if extra}
       <div class="absolute inset-0 p-4">
         {@render extra({ info: { src, alt, title, href, id, width, height } })}
@@ -64,13 +65,13 @@
     md:supports-[grid-template-rows:masonry]:grid-cols-2
 	"
 >
-	{#each images as img}
+	{#each images as img, i}
 		{#if img.href}
 			<a href={img.href} rel="noreferrer noopener">
-				{@render figure(img)}
+				{@render figure(img, i < 6)}
 			</a>
 		{:else}
-			{@render figure(img)}
+			{@render figure(img, i < 6)}
 		{/if}
 	{/each}
 </article>
