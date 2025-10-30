@@ -49,7 +49,7 @@
 				files.map(async (f) => {
 					try {
 						fileDims.set(f.name, await measureFile(f));
-					} catch(e) {
+					} catch (e) {
 						console.error('Error measuring file dimensions for', f.name, e);
 						// leave missing; we’ll default to 0/0
 					}
@@ -109,7 +109,10 @@
 									if (xhr.status >= 200 && xhr.status < 300) {
 										progressMap[item.file.name].status = 'done';
 										completedIds.push(item.ticket.id);
-										idToDims.set(item.ticket.id, fileDims.get(item.file.name) ?? { width: 0, height: 0 });
+										idToDims.set(
+											item.ticket.id,
+											fileDims.get(item.file.name) ?? { width: 0, height: 0 }
+										);
 										resolve();
 									} else {
 										if (n < maxRetries) {
@@ -225,7 +228,10 @@
 
 	let remeasuring = $state(false);
 	let remeasureMap = $state<
-		Record<string, { loaded: number; total: number; status: 'measuring' | 'saving' | 'done' | 'error' }>
+		Record<
+			string,
+			{ loaded: number; total: number; status: 'measuring' | 'saving' | 'done' | 'error' }
+		>
 	>({});
 	async function remeasureAll() {
 		remeasuring = true;
@@ -254,18 +260,20 @@
 					// Fallback: may ignore EXIF in some browsers
 					const objectUrl = URL.createObjectURL(blob);
 					try {
-						({ width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-							const img = new Image();
-							img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-							img.onerror = reject;
-							img.src = objectUrl;
-						}));
+						({ width, height } = await new Promise<{ width: number; height: number }>(
+							(resolve, reject) => {
+								const img = new Image();
+								img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+								img.onerror = reject;
+								img.src = objectUrl;
+							}
+						));
 					} finally {
 						URL.revokeObjectURL(objectUrl);
 					}
 				}
 
-				remeasureMap[id].loaded = 1;    // show 100%
+				remeasureMap[id].loaded = 1; // show 100%
 				remeasureMap[id].status = 'saving';
 				return { id, width, height };
 			} catch (e) {
@@ -303,11 +311,13 @@
 				for (const m of measured) remeasureMap[m.id].status = 'error';
 				toast.error('Failed to save new dimensions', { position: 'top-left' });
 			} else {
-				const { updated, skipped } = await res.json() as { updated: number; skipped: number };
+				const { updated, skipped } = (await res.json()) as { updated: number; skipped: number };
 				for (const m of measured) {
 					remeasureMap[m.id].status = 'done';
 				}
-				toast.success(`Re-measured ${updated}${skipped ? `, skipped ${skipped}` : ''}.`, { position: 'top-left' });
+				toast.success(`Re-measured ${updated}${skipped ? `, skipped ${skipped}` : ''}.`, {
+					position: 'top-left'
+				});
 				// Refresh the page so Gallery gets the new width/height
 				location.reload();
 			}
@@ -326,20 +336,21 @@
 		</Button>
 		<h1 class="text-xl font-semibold">{data.collection.name}</h1>
 		<div class="flex items-center gap-2">
-			<!-- <Button class="cursor-pointer" variant="outline" onclick={remeasureAll}>
-				Re-measure
-			</Button>
+			<Button class="cursor-pointer" variant="outline" onclick={remeasureAll}>Re-measure</Button>
 			<Dialog.Root bind:open={remeasuring}>
 				<Dialog.Content>
 					<Dialog.Header>
 						<Dialog.Title>Re-measuring images</Dialog.Title>
 					</Dialog.Header>
-					<div class="flex flex-col gap-2">
+					<div class="flex max-h-[60vh] flex-col gap-2 overflow-auto">
 						{#each Object.entries(remeasureMap) as [id, p]}
 							<div class="flex items-center gap-3">
 								<div class="w-40 truncate">{id}</div>
 								<div class="h-2 flex-1 rounded bg-gray-200">
-									<div class="h-2 rounded" style={`width:${p.total ? ((p.loaded / p.total) * 100).toFixed(1) : 0}%`}></div>
+									<div
+										class="h-2 rounded"
+										style={`width:${p.total ? ((p.loaded / p.total) * 100).toFixed(1) : 0}%`}
+									></div>
 								</div>
 								<div class="w-24 text-sm capitalize">{p.status}</div>
 								{#if p.status === 'measuring' || p.status === 'saving'}
@@ -349,7 +360,7 @@
 						{/each}
 					</div>
 				</Dialog.Content>
-			</Dialog.Root> -->
+			</Dialog.Root>
 			<Button class="cursor-pointer" onclick={pickFiles}>
 				{#if uploading}
 					<div class="contents" transition:fade>
@@ -365,7 +376,7 @@
 					<Dialog.Header>
 						<Dialog.Title>Upload</Dialog.Title>
 					</Dialog.Header>
-					<div class="flex flex-col gap-2 overflow-auto max-h-[60vh]">
+					<div class="flex max-h-[60vh] flex-col gap-2 overflow-auto">
 						{#each Object.entries(progressMap) as [name, p]}
 							<div class="flex items-center gap-3">
 								<div class="w-40 truncate">{name}</div>
