@@ -4,10 +4,10 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "lukas-wicke-de",
+	"name": "ess-ridley-de",
 	"routes": [
 		{
-			"pattern": "lukas-wicke.de",
+			"pattern": "ess-ridley.de",
 			"custom_domain": true
 		},
 	],
@@ -18,7 +18,7 @@
 		"nodejs_compat"
 	],
 	"assets": {
-		"binding": "ASSETS",
+		"binding": "ESS_ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
 	"observability": {
@@ -30,8 +30,8 @@
 	"kv_namespaces": [
 		{
 			"binding": "KV",
-			"id": "7850feb3348347f2901b3ee03c9dac51",
-			"preview_id": "feeeeaada15546fd9630ef93ef16a263"
+			"id": "d2d023cdb3b9427a800584549baa99fd",
+			"preview_id": "d2d023cdb3b9427a800584549baa99fd"
 		}
 	],
 	"vars": {
