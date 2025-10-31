@@ -45,6 +45,7 @@
 	}
 
 	let settingsDialogOpen = $state(false);
+	let gettingUploadTickets = $state(false);
 	let uploading = $state(false);
 	let deleting = $state<string | null>(null);
 	let deletingCollection = $state(false);
@@ -68,15 +69,13 @@
 		>
 	>({});
 
-	function barClassForMeasure(s: string) {
-		return s === 'done'
-			? 'bg-blue-800'
-			: s === 'measuring'
-				? 'bg-blue-600'
-				: s === 'error'
-					? 'bg-red-600'
-					: 'bg-gray-300';
-	}
+	let numDone = $derived(() => {
+		return Object.values(progressMap).filter((p) => p.finalize.status === 'done').length;
+	});
+	let numTotal = $derived(() => {
+		return Object.keys(progressMap).length;
+	});
+
 	function barClassForUpload(s: string) {
 		return s === 'done'
 			? 'bg-green-800'
@@ -171,12 +170,14 @@
 			});
 
 			try {
+				gettingUploadTickets = true;
 				const tickets = await prepareUploadTickets(files.length);
 
 				// sanity check to keep mapping 1:1 with files
 				if (tickets.length !== files.length) {
 					throw new Error(`Server returned ${tickets.length} tickets for ${files.length} files`);
 				}
+				gettingUploadTickets = false;
 
 				const queue = files.map((file, idx) => {
 					const ticket = tickets[idx];
@@ -467,7 +468,19 @@
 					onInteractOutside={(e) => e.preventDefault()}
 				>
 					<Dialog.Header>
-						<Dialog.Title>Upload</Dialog.Title>
+						<Dialog.Title>
+							<div class="flex items-center justify-between">
+								<span>
+									Upload ({numDone()}/{numTotal()})
+								</span>
+								{#if gettingUploadTickets}
+									<div>
+										<span class="mr-2">Getting upload tickets...</span>
+										<Loader2Icon class="animate-spin" />
+									</div>
+								{/if}
+							</div>
+						</Dialog.Title>
 					</Dialog.Header>
 
 					<div class="flex max-h-[60vh] flex-col gap-3 overflow-auto">
@@ -476,22 +489,16 @@
 								<div class="flex items-center justify-between gap-2">
 									<div class="w-52 truncate">{name}</div>
 									<div class="text-xs capitalize opacity-70">
-										Finalize: {titleCase(p.finalize.status)}
+										{titleCase(
+											p.measure.status === 'measuring'
+												? 'measuring'
+												: p.upload.status === 'uploading'
+													? 'uploading'
+													: p.finalize.status === 'finalizing'
+														? 'finalizing'
+														: p.finalize.status
+										)}
 									</div>
-								</div>
-
-								<!-- Measuring bar -->
-								<div class="flex items-center gap-2">
-									<div class="w-20 text-xs opacity-70">Measure</div>
-									<div class="h-2 w-full rounded bg-gray-200">
-										<div
-											class={`h-2 rounded ${barClassForMeasure(p.measure.status)}`}
-											style={`width:${(p.measure.loaded / p.measure.total) * 100}%`}
-										></div>
-									</div>
-									{#if p.measure.status === 'measuring'}
-										<Loader2Icon class="ml-1 size-4 animate-spin" />
-									{/if}
 								</div>
 
 								<!-- Upload bar -->
