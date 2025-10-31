@@ -91,6 +91,34 @@
 	}
 	let completedIds: string[] = [];
 
+	/** Request upload tickets in batches of up to 40 per request to avoid CF "too many subrequests". */
+	async function prepareUploadTickets(total: number): Promise<{ id: string; uploadURL: string }[]> {
+		const MAX_PER_CALL = 40;
+		const tickets: { id: string; uploadURL: string }[] = [];
+		const url = `./${data.collection.name.toLowerCase()}/prepareUploads`;
+
+		let remaining = total;
+		while (remaining > 0) {
+			const take = Math.min(MAX_PER_CALL, remaining);
+			const fd = new FormData();
+			fd.append('count', String(take));
+
+			const res = await fetch(url, { method: 'POST', body: fd });
+			if (!res.ok) throw new Error(await res.text());
+
+			const json = (await res.json()) as { tickets: { id: string; uploadURL: string }[] };
+			const got = json.tickets ?? [];
+
+			// If the server returns fewer than requested, we'll use what we got and stop.
+			tickets.push(...got);
+			if (got.length < take) break;
+
+			remaining -= take;
+		}
+
+		return tickets;
+	}
+
 	async function pickFiles() {
 		const input = document.createElement('input');
 		input.type = 'file';
@@ -143,17 +171,12 @@
 			});
 
 			try {
-				// Ask server for tickets while measuring runs
-				const prepFd = new FormData();
-				prepFd.append('count', String(files.length));
-				const prepRes = await fetch(`./${data.collection.name.toLowerCase()}/prepareUploads`, {
-					method: 'POST',
-					body: prepFd
-				});
-				if (!prepRes.ok) throw new Error(await prepRes.text());
-				const { tickets } = (await prepRes.json()) as {
-					tickets: { id: string; uploadURL: string }[];
-				};
+				const tickets = await prepareUploadTickets(files.length);
+
+				// sanity check to keep mapping 1:1 with files
+				if (tickets.length !== files.length) {
+					throw new Error(`Server returned ${tickets.length} tickets for ${files.length} files`);
+				}
 
 				const queue = files.map((file, idx) => {
 					const ticket = tickets[idx];
@@ -464,7 +487,7 @@
 										<div
 											class={`h-2 rounded ${barClassForMeasure(p.measure.status)}`}
 											style={`width:${(p.measure.loaded / p.measure.total) * 100}%`}
-										/>
+										></div>
 									</div>
 									{#if p.measure.status === 'measuring'}
 										<Loader2Icon class="ml-1 size-4 animate-spin" />
@@ -478,7 +501,7 @@
 										<div
 											class={`h-2 rounded ${barClassForUpload(p.upload.status)}`}
 											style={`width:${p.upload.total ? ((p.upload.loaded / p.upload.total) * 100).toFixed(1) : 0}%`}
-										/>
+										></div>
 									</div>
 									{#if p.upload.status === 'uploading'}
 										<Loader2Icon class="ml-1 size-4 animate-spin" />
