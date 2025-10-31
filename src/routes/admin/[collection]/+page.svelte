@@ -15,6 +15,35 @@
 	import IBack from '$lib/components/icons/i-back.svelte';
 	const { data } = $props() as PageProps;
 
+	/** Run async work over a list with a max number of concurrent workers. */
+	async function mapWithConcurrency<T, R>(
+		items: T[],
+		limit: number,
+		worker: (item: T, index: number) => Promise<R>
+	): Promise<R[]> {
+		if (limit < 1) throw new Error('limit must be >= 1');
+		let i = 0;
+		const results = new Array<R>(items.length);
+		const workerLoop = async () => {
+			while (i < items.length) {
+				const idx = i++;
+				results[idx] = await worker(items[idx], idx);
+			}
+		};
+		const workers = Array.from({ length: Math.min(limit, items.length) }, workerLoop);
+		await Promise.all(workers);
+		return results;
+	}
+
+	/** For side-effect tasks where you don't need the results. */
+	async function forEachWithConcurrency<T>(
+		items: T[],
+		limit: number,
+		worker: (item: T, index: number) => Promise<void>
+	): Promise<void> {
+		await mapWithConcurrency(items, limit, worker as any);
+	}
+
 	let settingsDialogOpen = $state(false);
 	let uploading = $state(false);
 	let deleting = $state<string | null>(null);
@@ -23,44 +52,100 @@
 		Record<
 			string,
 			{
-				loaded: number;
-				total: number;
-				status: 'queued' | 'uploading' | 'done' | 'error' | 'finalizing';
-				tries: number;
+				measure: {
+					loaded: number;
+					total: number;
+					status: 'pending' | 'measuring' | 'done' | 'error';
+				};
+				upload: {
+					loaded: number;
+					total: number;
+					status: 'queued' | 'uploading' | 'done' | 'error';
+					tries: number;
+				};
+				finalize: { status: 'pending' | 'finalizing' | 'done' | 'error' };
 			}
 		>
 	>({});
+
+	function barClassForMeasure(s: string) {
+		return s === 'done'
+			? 'bg-blue-800'
+			: s === 'measuring'
+				? 'bg-blue-600'
+				: s === 'error'
+					? 'bg-red-600'
+					: 'bg-gray-300';
+	}
+	function barClassForUpload(s: string) {
+		return s === 'done'
+			? 'bg-green-800'
+			: s === 'uploading'
+				? 'bg-green-600'
+				: s === 'error'
+					? 'bg-red-600'
+					: 'bg-gray-300';
+	}
+	function titleCase(s: string) {
+		return s.charAt(0).toUpperCase() + s.slice(1);
+	}
 	let completedIds: string[] = [];
 
-	function pickFiles() {
+	async function pickFiles() {
 		const input = document.createElement('input');
 		input.type = 'file';
 		input.accept = 'image/*';
 		input.multiple = true;
 		input.onchange = async () => {
 			if (!input.files || input.files.length === 0) return;
+
 			uploading = true;
 			completedIds = [];
 			progressMap = {};
+
 			const files = Array.from(input.files);
 
+			// Seed parallel phase UIs
+			for (const f of files) {
+				progressMap[f.name] = {
+					measure: { loaded: 0, total: 1, status: 'pending' },
+					upload: { loaded: 0, total: f.size, status: 'queued', tries: 0 },
+					finalize: { status: 'pending' }
+				};
+			}
+
+			// Shared state
 			const fileDims = new Map<string, { width: number; height: number }>();
-			await Promise.all(
-				files.map(async (f) => {
-					try {
-						fileDims.set(f.name, await measureFile(f));
-					} catch (e) {
-						console.error('Error measuring file dimensions for', f.name, e);
-						// leave missing; we’ll default to 0/0
-					}
-				})
-			);
+			const nameToId = new Map<string, string>();
+			const idToDims = new Map<string, { width: number; height: number }>();
+			const finalized = new Set<string>(); // by ticket id
+
+			let successFinalized = 0;
+			let failedUploads = 0;
+
+			// Start measuring immediately (do NOT await yet)
+			const MEASURE_CONCURRENCY = 3;
+			const measurePromise = forEachWithConcurrency(files, MEASURE_CONCURRENCY, async (f) => {
+				progressMap[f.name].measure.status = 'measuring';
+				try {
+					const dims = await measureFile(f);
+					fileDims.set(f.name, dims);
+					progressMap[f.name].measure.loaded = 1;
+					progressMap[f.name].measure.status = 'done';
+				} catch {
+					progressMap[f.name].measure.status = 'error';
+				}
+				// If upload already done for this file, we can attempt to finalize now
+				const id = nameToId.get(f.name);
+				if (id) {
+					tryFinalize(id, f.name);
+				}
+			});
 
 			try {
-				// 1) Ask server for N direct-upload tickets
+				// Ask server for tickets while measuring runs
 				const prepFd = new FormData();
 				prepFd.append('count', String(files.length));
-
 				const prepRes = await fetch(`./${data.collection.name.toLowerCase()}/prepareUploads`, {
 					method: 'POST',
 					body: prepFd
@@ -70,58 +155,51 @@
 					tickets: { id: string; uploadURL: string }[];
 				};
 
-				const idToName = new Map<string, string>();
-				const idToDims = new Map<string, { width: number; height: number }>();
-
-				// 2) Upload with throttling + progress
-				const CONCURRENCY = 3;
 				const queue = files.map((file, idx) => {
 					const ticket = tickets[idx];
-					const dims = fileDims.get(file.name);
-					idToName.set(ticket.id, file.name);
-					if (dims) idToDims.set(ticket.id, dims);
-					return { file, ticket, dims };
+					nameToId.set(file.name, ticket.id);
+					return { file, ticket };
 				});
 
-				for (const { file } of queue) {
-					progressMap[file.name] = { loaded: 0, total: file.size, status: 'queued', tries: 0 };
-				}
-
+				// Upload with throttling, in parallel with ongoing measuring
+				const UPLOAD_CONCURRENCY = 1; // tweak as desired
 				const runOne = (item: { file: File; ticket: { id: string; uploadURL: string } }) =>
 					new Promise<void>((resolve) => {
 						const maxRetries = 3;
-
 						const attempt = (n: number) => {
-							progressMap[item.file.name].status = 'uploading';
-							progressMap[item.file.name].tries = n;
+							progressMap[item.file.name].upload.status = 'uploading';
+							progressMap[item.file.name].upload.tries = n;
 
 							const xhr = new XMLHttpRequest();
 							xhr.open('POST', item.ticket.uploadURL, true);
 
 							xhr.upload.onprogress = (e) => {
 								if (e.lengthComputable) {
-									progressMap[item.file.name].loaded = e.loaded;
-									progressMap[item.file.name].total = e.total;
+									progressMap[item.file.name].upload.loaded = e.loaded;
+									progressMap[item.file.name].upload.total = e.total;
 								}
 							};
 							xhr.onreadystatechange = () => {
 								if (xhr.readyState === 4) {
 									if (xhr.status >= 200 && xhr.status < 300) {
-										progressMap[item.file.name].status = 'done';
-										completedIds.push(item.ticket.id);
-										idToDims.set(
-											item.ticket.id,
-											fileDims.get(item.file.name) ?? { width: 0, height: 0 }
-										);
+										progressMap[item.file.name].upload.status = 'done';
+										progressMap[item.file.name].upload.loaded =
+											progressMap[item.file.name].upload.total;
+
+										// cache dims if already known
+										const dims = fileDims.get(item.file.name);
+										if (dims) idToDims.set(item.ticket.id, dims);
+
+										// Attempt finalize if measuring already finished (or errored)
+										tryFinalize(item.ticket.id, item.file.name);
 										resolve();
 									} else {
 										if (n < maxRetries) {
-											// simple backoff
-											const delay = 300 * Math.pow(2, n);
-											setTimeout(() => attempt(n + 1), delay);
+											setTimeout(() => attempt(n + 1), 300 * Math.pow(2, n));
 										} else {
-											progressMap[item.file.name].status = 'error';
-											resolve(); // swallow; we’ll report errors later
+											progressMap[item.file.name].upload.status = 'error';
+											failedUploads += 1;
+											resolve();
 										}
 									}
 								}
@@ -129,61 +207,26 @@
 
 							const fd = new FormData();
 							fd.append('file', item.file);
-							// you can add metadata if you want to set later:
-							// fd.append('metadata', JSON.stringify({ alt: item.file.name }))
 							xhr.send(fd);
 						};
-
 						attempt(0);
 					});
 
-				// throttle
-				let idx = 0;
-				const workers: Promise<void>[] = [];
-				for (let i = 0; i < Math.min(CONCURRENCY, queue.length); i++) {
-					workers.push(
-						(async function loop() {
-							while (idx < queue.length) {
-								const current = queue[idx++];
-								await runOne(current);
-							}
-						})()
-					);
-				}
-				await Promise.all(workers);
+				const uploadPromise = forEachWithConcurrency(queue, UPLOAD_CONCURRENCY, async (item) => {
+					await runOne(item);
+				});
 
-				// 3) Finalize only the successful ones
-				if (completedIds.length) {
-					for (const id of completedIds) {
-						const name = idToName.get(id);
-						if (name && progressMap[name]) {
-							progressMap[name].status = 'finalizing';
-							progressMap[name].loaded = 0;
-							progressMap[name].total = 1;
-						}
-					}
+				// Wait for uploads & measuring to finish; finalization fires per-file as they become eligible
+				await Promise.all([measurePromise, uploadPromise]);
 
-					const items = completedIds.map((id) => {
-						const dims = idToDims.get(id);
-						return { id, width: dims?.width ?? 0, height: dims?.height ?? 0 };
-					});
+				// After both phases done, if any file is uploaded but measurement never completed, we still finalize with 0/0 inside tryFinalize (already called). Nothing extra to do here.
 
-					const finFd = new FormData();
-					finFd.append('items', JSON.stringify(items));
-					const finRes = await fetch(`./${data.collection.name.toLowerCase()}/finalizeUploads`, {
-						method: 'POST',
-						body: finFd
-					});
-					if (!finRes.ok) throw new Error(await finRes.text());
-					const { saved } = (await finRes.json()) as { saved: number };
-				}
-
-				const failed = Object.entries(progressMap).filter(([, v]) => v.status === 'error').length;
-				if (failed === 0) {
-					toast.success('Files uploaded successfully!', { position: 'top-left' });
+				// Make a summary toast
+				if (failedUploads === 0 && successFinalized > 0) {
+					toast.success('Files uploaded and finalized successfully!', { position: 'top-left' });
 					location.reload();
-				} else if (completedIds.length) {
-					toast.message(`Uploaded ${completedIds.length}, ${failed} failed.`, {
+				} else if (successFinalized > 0) {
+					toast.message(`Finalized ${successFinalized}, ${failedUploads} upload(s) failed.`, {
 						position: 'top-left'
 					});
 					location.reload();
@@ -195,6 +238,33 @@
 				toast.error('Error preparing or finalizing uploads.', { position: 'top-left' });
 			} finally {
 				uploading = false;
+			}
+
+			// per-file finalize once both (upload + measure) complete
+			async function tryFinalize(id: string, name: string) {
+				if (finalized.has(id)) return;
+
+				const up = progressMap[name]?.upload.status;
+				const ms = progressMap[name]?.measure.status;
+				if (up !== 'done' || (ms !== 'done' && ms !== 'error')) return; // wait until both finished (or measuring failed)
+
+				finalized.add(id);
+				progressMap[name].finalize.status = 'finalizing';
+
+				const dims = fileDims.get(name) ?? { width: 0, height: 0 };
+				const finFd = new FormData();
+				finFd.append('items', JSON.stringify([{ id, width: dims.width, height: dims.height }]));
+				try {
+					const finRes = await fetch(`./${data.collection.name.toLowerCase()}/finalizeUploads`, {
+						method: 'POST',
+						body: finFd
+					});
+					if (!finRes.ok) throw new Error(await finRes.text());
+					progressMap[name].finalize.status = 'done';
+					successFinalized += 1;
+				} catch {
+					progressMap[name].finalize.status = 'error';
+				}
 			}
 		};
 		input.click();
@@ -282,21 +352,13 @@
 			}
 		};
 
-		// Throttle measurements (avoid hammering)
-		const CONCURRENCY = 6;
-		let idx = 0;
-		const measured: Array<{ id: string; width: number; height: number }> = [];
+		const CONCURRENCY = 3;
 
-		const worker = async () => {
-			while (idx < items.length) {
-				const { id, src } = items[idx++];
-				const m = await measureOne(id, src);
-				if (m) measured.push(m);
-			}
-		};
-
-		const workers = Array.from({ length: Math.min(CONCURRENCY, items.length) }, worker);
-		await Promise.all(workers);
+		const measured = (
+			await mapWithConcurrency(items, CONCURRENCY, async ({ id, src }) => {
+				return await measureOne(id, src); // returns {id,width,height} | null
+			})
+		).filter((m): m is { id: string; width: number; height: number } => m !== null);
 
 		// Save results in one request
 		if (measured.length) {
@@ -338,7 +400,11 @@
 		<div class="flex items-center gap-2">
 			<Button class="cursor-pointer" variant="outline" onclick={remeasureAll}>Re-measure</Button>
 			<Dialog.Root bind:open={remeasuring}>
-				<Dialog.Content>
+				<Dialog.Content
+					escapeKeydownBehavior="ignore"
+					showCloseButton={false}
+					onInteractOutside={(e) => e.preventDefault()}
+				>
 					<Dialog.Header>
 						<Dialog.Title>Re-measuring images</Dialog.Title>
 					</Dialog.Header>
@@ -348,7 +414,7 @@
 								<div class="w-40 truncate">{id}</div>
 								<div class="h-2 flex-1 rounded bg-gray-200">
 									<div
-										class="h-2 rounded"
+										class="h-2 rounded bg-green-600"
 										style={`width:${p.total ? ((p.loaded / p.total) * 100).toFixed(1) : 0}%`}
 									></div>
 								</div>
@@ -372,29 +438,58 @@
 				</div>
 			</Button>
 			<Dialog.Root bind:open={uploading}>
-				<Dialog.Content>
+				<Dialog.Content
+					escapeKeydownBehavior="ignore"
+					showCloseButton={false}
+					onInteractOutside={(e) => e.preventDefault()}
+				>
 					<Dialog.Header>
 						<Dialog.Title>Upload</Dialog.Title>
 					</Dialog.Header>
-					<div class="flex max-h-[60vh] flex-col gap-2 overflow-auto">
+
+					<div class="flex max-h-[60vh] flex-col gap-3 overflow-auto">
 						{#each Object.entries(progressMap) as [name, p]}
-							<div class="flex items-center gap-3">
-								<div class="w-40 truncate">{name}</div>
-								<div class="h-2 flex-1 rounded bg-gray-200">
-									<div
-										class="h-2 rounded"
-										style={`width:${p.total ? ((p.loaded / p.total) * 100).toFixed(1) : 0}%`}
-									></div>
+							<div class="flex w-full flex-col gap-1">
+								<div class="flex items-center justify-between gap-2">
+									<div class="w-52 truncate">{name}</div>
+									<div class="text-xs capitalize opacity-70">
+										Finalize: {titleCase(p.finalize.status)}
+									</div>
 								</div>
-								<div class="w-24 text-sm">{p.status}</div>
-								{#if p.status === 'uploading'}
-									<Loader2Icon class="animate-spin" />
-								{/if}
+
+								<!-- Measuring bar -->
+								<div class="flex items-center gap-2">
+									<div class="w-20 text-xs opacity-70">Measure</div>
+									<div class="h-2 w-full rounded bg-gray-200">
+										<div
+											class={`h-2 rounded ${barClassForMeasure(p.measure.status)}`}
+											style={`width:${(p.measure.loaded / p.measure.total) * 100}%`}
+										/>
+									</div>
+									{#if p.measure.status === 'measuring'}
+										<Loader2Icon class="ml-1 size-4 animate-spin" />
+									{/if}
+								</div>
+
+								<!-- Upload bar -->
+								<div class="flex items-center gap-2">
+									<div class="w-20 text-xs opacity-70">Upload</div>
+									<div class="h-2 w-full rounded bg-gray-200">
+										<div
+											class={`h-2 rounded ${barClassForUpload(p.upload.status)}`}
+											style={`width:${p.upload.total ? ((p.upload.loaded / p.upload.total) * 100).toFixed(1) : 0}%`}
+										/>
+									</div>
+									{#if p.upload.status === 'uploading'}
+										<Loader2Icon class="ml-1 size-4 animate-spin" />
+									{/if}
+								</div>
 							</div>
 						{/each}
 					</div>
 				</Dialog.Content>
 			</Dialog.Root>
+
 			<Dialog.Root bind:open={settingsDialogOpen}>
 				<Button
 					variant="outline"

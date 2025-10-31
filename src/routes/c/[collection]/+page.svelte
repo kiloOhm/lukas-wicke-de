@@ -17,5 +17,5 @@
 </svelte:head>
 
 <section>
-	<Gallery images={images} />
+	<Gallery {images} />
 </section>
