@@ -474,7 +474,7 @@
 									Upload ({numDone()}/{numTotal()})
 								</span>
 								{#if gettingUploadTickets}
-									<div>
+									<div class="flex items-center gap-4">
 										<span class="mr-2">Getting upload tickets...</span>
 										<Loader2Icon class="animate-spin" />
 									</div>

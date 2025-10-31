@@ -63,22 +63,37 @@
 
 	// IO-powered lazy: set src only when visible (works reliably vs columns)
 	function lazySrc(node: HTMLImageElement, src: string) {
-		// Avoid native lazy when we control it — some browsers overfetch with masonry/columns
 		node.loading = 'eager';
+
+		let current = src;
+		let seen = false;
+
 		const io = new IntersectionObserver(
 			(entries) => {
 				for (const e of entries) {
 					if (e.isIntersecting) {
-						node.src = src;
+						node.src = current;
+						seen = true;
 						io.disconnect();
 						break;
 					}
 				}
 			},
-			{ rootMargin: '400px' } // pre-load a bit before it appears
+			{ rootMargin: '400px' }
 		);
+
 		io.observe(node);
+
 		return {
+			update(next: string) {
+				if (next !== current) {
+					current = next;
+					if (seen) {
+						// already intersected once; just swap now
+						node.src = current;
+					}
+				}
+			},
 			destroy() {
 				io.disconnect();
 			}
@@ -87,7 +102,7 @@
 </script>
 
 <article aria-label="Photo gallery" class="masonry">
-	{#each images as img, i}
+	{#each images as img, i (img.id)}
 		<figure
 			class="card"
 			use:spanByAspect
