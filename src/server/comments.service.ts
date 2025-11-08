@@ -43,6 +43,14 @@ export async function addComment(
 	const createdAt = new Date().toISOString();
 	const safeName = (name ?? 'Guest').slice(0, 80);
 
+	if (text.trim().length === 0) {
+		throw new Error('Comment text is required');
+	}
+
+	if (text.length > 1000) {
+		throw new Error('Comment text too long');
+	}
+
 	// Insert comment + atomically bump the counter
 	await db.batch([
 		db.insert(schema.comments).values({

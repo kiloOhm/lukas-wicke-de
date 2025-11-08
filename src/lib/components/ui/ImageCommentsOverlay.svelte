@@ -244,8 +244,8 @@
 
 		<div class="flex max-h-[80vh] flex-col gap-3">
 			<!-- Image on top -->
-			<div class="max-h-[50vh] w-full flex-shrink-0 overflow-hidden rounded-md bg-black">
-				<img src={info.src} alt={info.alt} class="mx-auto max-h-[50vh] w-auto object-contain" />
+			<div class="max-h-[30vh] w-full flex-shrink-0 overflow-hidden rounded-md bg-black">
+				<img src={info.src} alt={info.alt} class="mx-auto max-h-[30vh] w-auto object-contain" />
 			</div>
 
 			<form
@@ -266,6 +266,20 @@
 					{posting ? 'Posting…' : 'Post'}
 				</Button>
 			</form>
+			<div class="mb-1 flex justify-end text-xs text-neutral-400">
+				<span>Commenting as "<b>{username ?? 'Guest'}</b>"</span>
+				{#if username}
+					<button
+						type="button"
+						class="ml-1 cursor-pointer underline underline-offset-2 hover:no-underline"
+						onclick={() => {
+							showNameDialog = true;
+						}}
+					>
+						change
+					</button>
+				{/if}
+			</div>
 
 			<!-- Comments list -->
 			<div class="mt-1 space-y-2 pr-1 pb-10 text-sm">
