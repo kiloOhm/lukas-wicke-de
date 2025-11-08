@@ -22,7 +22,17 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
 			};
 			return json.result;
 		},
-		async getSignedUrl(imgId: string, variant: 'private4k' | 'public' | 'thumb' | 'private1440') {
+		async getSignedUrl(
+			imgId: string,
+			variant:
+				| 'private8k'
+				| 'private4k'
+				| 'public'
+				| 'thumb'
+				| 'private1440'
+				| 'private800'
+				| 'private400'
+		) {
 			const accountHash =
 				platform.env.CF_IMAGES_ACCOUNT_HASH ?? import.meta.env.CF_IMAGES_ACCOUNT_HASH;
 			const apiKey = platform.env.CF_IMAGES_API_TOKEN ?? import.meta.env.CF_IMAGES_API_TOKEN;

@@ -24,18 +24,42 @@ export const load: PageServerLoad = async ({ url, platform, params, cookies }) =
 	}
 	const { getSignedUrl } = useCloudflareImagesService(platform);
 
-	const images: GalleryItemInfo[] =
+	const images: (GalleryItemInfo & {
+		src400: string;
+		src800: string;
+		src1440: string;
+		src4k: string;
+		src8k: string;
+	})[] =
 		(await Promise.all(
-			collection.images.map(
-				async (image) =>
-					({
-						alt: image.alt,
-						src: (await getSignedUrl(image.id, 'private1440')).href,
-						id: image.id,
-						width: image.width,
-						height: image.height
-					}) as GalleryItemInfo
-			)
+			collection.images.map(async (image) => {
+				const [url400, url800, url1440, url4k, url8k] = await Promise.all([
+					getSignedUrl(image.id, 'private400'),
+					getSignedUrl(image.id, 'private800'),
+					getSignedUrl(image.id, 'private1440'),
+					getSignedUrl(image.id, 'private4k'),
+					getSignedUrl(image.id, 'private8k')
+				]);
+
+				return {
+					alt: image.alt,
+					src: url1440.href,
+					id: image.id,
+					width: image.width,
+					height: image.height,
+					src400: url400.href,
+					src800: url800.href,
+					src1440: url1440.href,
+					src4k: url4k.href,
+					src8k: url8k.href
+				} as GalleryItemInfo & {
+					src400: string;
+					src800: string;
+					src1440: string;
+					src4k: string;
+					src8k: string;
+				};
+			})
 		)) ?? [];
 
 	const db = createDb(platform.env.DB);

@@ -4,8 +4,21 @@
 	const EAGER_LOAD_COUNT = 4;
 	const BLANK_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
-	// Allow optional href on each image
-	type GalleryImage = GalleryItemInfo & { href?: string };
+	// Roughly matches your masonry layout:
+	// - small screens: full width
+	// - medium: half width
+	// - large: ~third of viewport
+	const RESPONSIVE_SIZES = '(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 33vw';
+
+	// Allow optional href + the srcset variants
+	type GalleryImage = GalleryItemInfo & {
+		href?: string;
+		src400: string;
+		src800: string;
+		src1440: string;
+		src4k: string;
+		src8k: string;
+	};
 
 	const { images, extra }: { images: GalleryImage[]; extra?: any } = $props();
 
@@ -68,11 +81,19 @@
 		};
 	}
 
-	// IO-powered lazy: set src only when visible (works reliably vs columns)
-	function lazySrc(node: HTMLImageElement, src: string) {
+	// IO-powered lazy: set src / srcset / sizes only when visible
+	type LazySrcParams =
+		| string
+		| {
+				src: string;
+				srcset?: string;
+				sizes?: string;
+		  };
+
+	function lazySrc(node: HTMLImageElement, params: LazySrcParams) {
 		node.loading = 'eager';
 
-		let current = src;
+		let current = params;
 		let seen = false;
 
 		// prevent browser from showing alt text before we swap in the real src
@@ -80,11 +101,28 @@
 			node.src = BLANK_IMAGE;
 		}
 
+		function apply(p: LazySrcParams) {
+			if (typeof p === 'string') {
+				node.src = p;
+				return;
+			}
+
+			node.src = p.src;
+
+			if (p.srcset) {
+				node.srcset = p.srcset;
+			}
+
+			if (p.sizes) {
+				node.sizes = p.sizes;
+			}
+		}
+
 		const io = new IntersectionObserver(
 			(entries) => {
 				for (const e of entries) {
 					if (e.isIntersecting) {
-						node.src = current;
+						apply(current);
 						seen = true;
 						io.disconnect();
 						break;
@@ -97,13 +135,10 @@
 		io.observe(node);
 
 		return {
-			update(next: string) {
-				if (next !== current) {
-					current = next;
-					if (seen) {
-						// already intersected once; just swap now
-						node.src = current;
-					}
+			update(next: LazySrcParams) {
+				current = next;
+				if (seen) {
+					apply(current);
 				}
 			},
 			destroy() {
@@ -134,7 +169,9 @@
 							alt={img.alt}
 							width={img.width}
 							height={img.height}
-							src={img.src}
+							src={img.src1440}
+							srcset={`${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`}
+							sizes={RESPONSIVE_SIZES}
 							loading="eager"
 							decoding="async"
 							fetchpriority="high"
@@ -147,7 +184,11 @@
 							width={img.width}
 							height={img.height}
 							src={BLANK_IMAGE}
-							use:lazySrc={img.src}
+							use:lazySrc={{
+								src: img.src1440,
+								srcset: `${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`,
+								sizes: RESPONSIVE_SIZES
+							}}
 							loading="lazy"
 							decoding="async"
 						/>
@@ -159,7 +200,9 @@
 					alt={img.alt}
 					width={img.width}
 					height={img.height}
-					src={img.src}
+					src={img.src1440}
+					srcset={`${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`}
+					sizes={RESPONSIVE_SIZES}
 					loading="eager"
 					decoding="async"
 					fetchpriority="high"
@@ -171,7 +214,11 @@
 					width={img.width}
 					height={img.height}
 					src={BLANK_IMAGE}
-					use:lazySrc={img.src}
+					use:lazySrc={{
+						src: img.src1440,
+						srcset: `${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`,
+						sizes: RESPONSIVE_SIZES
+					}}
 					loading="lazy"
 					decoding="async"
 				/>
