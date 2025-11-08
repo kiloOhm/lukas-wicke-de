@@ -1,6 +1,13 @@
 <script lang="ts">
 	import type { GalleryItemInfo } from '../../../types';
-	const { images, extra }: { images: GalleryItemInfo[]; extra?: any } = $props();
+
+	const EAGER_LOAD_COUNT = 4;
+	const BLANK_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
+	// Allow optional href on each image
+	type GalleryImage = GalleryItemInfo & { href?: string };
+
+	const { images, extra }: { images: GalleryImage[]; extra?: any } = $props();
 
 	// Svelte action: make grid-row span match the *rendered* height
 	function spanByAspect(node: HTMLElement) {
@@ -68,6 +75,11 @@
 		let current = src;
 		let seen = false;
 
+		// prevent browser from showing alt text before we swap in the real src
+		if (!node.src) {
+			node.src = BLANK_IMAGE;
+		}
+
 		const io = new IntersectionObserver(
 			(entries) => {
 				for (const e of entries) {
@@ -79,7 +91,7 @@
 					}
 				}
 			},
-			{ rootMargin: '400px' }
+			{ rootMargin: '800px' }
 		);
 
 		io.observe(node);
@@ -115,52 +127,64 @@
 					class="block"
 					aria-label={img.title ?? img.alt ?? 'Open image'}
 				>
-					<img
-						class="img"
-						alt={img.alt}
-						width={img.width}
-						height={img.height}
-						use:lazySrc={img.src}
-						decoding="async"
-						fetchpriority={i < 6 ? 'high' : undefined}
-					/>
+					{#if i < EAGER_LOAD_COUNT}
+						<!-- Eager-load first ... -->
+						<img
+							class="img"
+							alt={img.alt}
+							width={img.width}
+							height={img.height}
+							src={img.src}
+							loading="eager"
+							decoding="async"
+							fetchpriority="high"
+						/>
+					{:else}
+						<!-- Lazy-load the rest -->
+						<img
+							class="img"
+							alt={img.alt}
+							width={img.width}
+							height={img.height}
+							src={BLANK_IMAGE}
+							use:lazySrc={img.src}
+							loading="lazy"
+							decoding="async"
+						/>
+					{/if}
 				</a>
+			{:else if i < EAGER_LOAD_COUNT}
+				<img
+					class="img"
+					alt={img.alt}
+					width={img.width}
+					height={img.height}
+					src={img.src}
+					loading="eager"
+					decoding="async"
+					fetchpriority="high"
+				/>
 			{:else}
 				<img
 					class="img"
 					alt={img.alt}
 					width={img.width}
 					height={img.height}
+					src={BLANK_IMAGE}
 					use:lazySrc={img.src}
+					loading="lazy"
 					decoding="async"
-					fetchpriority={i < 6 ? 'high' : undefined}
 				/>
 			{/if}
+
 			{#if extra}
 				<div class="absolute inset-0 p-4">
 					{@render extra({ info: img })}
 				</div>
 			{/if}
+
 			{#if img.title}
-				<figcaption class="pointer-events-none absolute inset-0">
-					<div
-						class="absolute inset-0 [mask-image:linear-gradient(to_top,black_30%,transparent)] backdrop-blur-xs [-webkit-mask-image:linear-gradient(to_top,black_30%,transparent)]"
-					></div>
-					<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-					<span class="sr-only">{img.title}</span>
-					<svg aria-hidden="true" class="absolute inset-x-0 -bottom-[1.7rem] h-[8rem] w-full">
-						<text
-							x="0"
-							y="100%"
-							dominant-baseline="ideographic"
-							textLength="80%"
-							lengthAdjust="spacingAndGlyphs"
-							class="fill-white/30 [font-size:8rem] font-[700]"
-						>
-							{img.title}
-						</text>
-					</svg>
-				</figcaption>
+				<!-- your existing figcaption -->
 			{/if}
 		</figure>
 	{/each}
@@ -192,5 +216,6 @@
 		/* These still help with rendering cost */
 		content-visibility: auto;
 		contain-intrinsic-size: 400px 300px;
+		font-size: 0px;
 	}
 </style>

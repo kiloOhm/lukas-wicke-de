@@ -2,6 +2,8 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import type { CollectionInfo, GalleryItemInfo } from '../../../types';
 import { useCloudflareImagesService } from '../../../server/cloudflare.service';
+import { createDb } from '../../../server/db/client';
+import { getCommentCountsForCollection } from '../../../server/comments.service';
 
 export const load: PageServerLoad = async ({ url, platform, params, cookies }) => {
 	if (!platform) {
@@ -22,21 +24,27 @@ export const load: PageServerLoad = async ({ url, platform, params, cookies }) =
 	}
 	const { getSignedUrl } = useCloudflareImagesService(platform);
 
+	const images: GalleryItemInfo[] =
+		(await Promise.all(
+			collection.images.map(
+				async (image) =>
+					({
+						alt: image.alt,
+						src: (await getSignedUrl(image.id, 'private1440')).href,
+						id: image.id,
+						width: image.width,
+						height: image.height
+					}) as GalleryItemInfo
+			)
+		)) ?? [];
+
+	const db = createDb(platform.env.DB);
+	const commentCounts = await getCommentCountsForCollection(db, collection.name);
+
 	return {
 		authorized,
 		name: collection.name,
-		images:
-			(await Promise.all(
-				collection.images.map(
-					async (image) =>
-						({
-							alt: image.alt,
-							src: (await getSignedUrl(image.id, 'private1440')).href,
-							id: image.id,
-							width: image.width,
-							height: image.height
-						}) as GalleryItemInfo
-				)
-			)) ?? []
+		images,
+		commentCounts
 	};
 };

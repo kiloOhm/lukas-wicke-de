@@ -9,14 +9,11 @@
 		{
 			"pattern": "ess-ridley.de",
 			"custom_domain": true
-		},
+		}
 	],
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2025-08-29",
-	"compatibility_flags": [
-		"nodejs_als",
-		"nodejs_compat"
-	],
+	"compatibility_flags": ["nodejs_als", "nodejs_compat"],
 	"assets": {
 		"binding": "ESS_ASSETS",
 		"directory": ".svelte-kit/cloudflare"
@@ -38,7 +35,12 @@
 		"CF_IMAGES_ACCOUNT_ID": "bc479fff0ed21d18a613d71c1af79682",
 		"CF_IMAGES_ACCOUNT_HASH": "k1HQsavJfzZQlI3O3ZBS7Q"
 	},
-	"ai": {
-		"binding": "AI"
-	}
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "ess-ridley-de",
+			"database_id": "b90d0fc1-0d3d-41b5-9081-0e463e7fcf38",
+			"migrations_dir": "drizzle"
+		}
+	]
 }
