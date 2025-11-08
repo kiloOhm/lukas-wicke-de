@@ -22,7 +22,7 @@
 
 <svelte:head>
 	<title>{data.name}</title>
-	<meta name="description" content="{data.name} - Lukas Wicke Photography" />
+	<meta name="description" content="{data.name} - Ess Ridley Photography" />
 </svelte:head>
 
 <section>
