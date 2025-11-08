@@ -7,6 +7,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import IExpand from '../icons/i-expand.svelte';
+	import IMessage from '../icons/i-message.svelte';
 
 	type Comment = {
 		id: string;
@@ -198,12 +199,12 @@
 </script>
 
 <!-- Overlay inside Gallery's absolute inset-0 container -->
-<div class="flex h-full flex-col justify-between">
+<div class="flex h-full flex-col justify-between p-2">
 	<!-- Top: fullscreen button -->
 	<div class="flex justify-end">
 		<Button
-			variant="secondary"
-			class="h-7 w-7 cursor-pointer rounded-full border-transparent"
+			variant="ghost"
+			class="h-7 w-7 cursor-pointer rounded-full"
 			onclick={(e) => {
 				e.stopPropagation();
 				openFullscreen();
@@ -217,16 +218,18 @@
 	<!-- Bottom: comment button with count -->
 	<div class="flex justify-end">
 		<Button
-			variant="secondary"
+			variant="ghost"
 			size="sm"
-			class="cursor-pointer rounded-full border-transparent"
+			class="cursor-pointer rounded-full bg-black/30! backdrop-blur-xs hover:bg-black/60!"
 			onclick={(e) => {
 				e.stopPropagation();
 				openComments();
 			}}
 			aria-label="Open comments"
 		>
-			<span aria-hidden="true" class="mr-1">💬</span>
+			<span aria-hidden="true" class="mr-1">
+				<IMessage class="h-4 w-4" />
+			</span>
 			<span>{commentCount}</span>
 		</Button>
 	</div>

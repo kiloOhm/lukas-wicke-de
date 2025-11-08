@@ -225,7 +225,7 @@
 			{/if}
 
 			{#if extra}
-				<div class="absolute inset-0 p-4">
+				<div class="absolute inset-0">
 					{@render extra({ info: img })}
 				</div>
 			{/if}
