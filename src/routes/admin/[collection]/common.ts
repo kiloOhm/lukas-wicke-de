@@ -17,8 +17,11 @@ export async function validateRequest({ platform, cookies, params }: RequestEven
       return redirect(302, '/admin/auth');
     }
     const collections = await platform?.env.KV.get<CollectionInfo[]>('collections', { type: 'json' }) ?? [];
-    const collection = collections.find(c => c.name.toLowerCase() === params.collection!.toLowerCase());
+    console.log(params.collection!.toLowerCase())
+    console.log(collections.map(c => c.name.toLowerCase()))
+    const collection = collections.find(c => c.name.toLowerCase().trim() === params.collection!.toLowerCase().trim());
     if (!collection) {
+      console.log('Collection not found, params.collection:', params.collection);
       return error(404, 'Collection not found');
     }
     return { collections, collection, platform };

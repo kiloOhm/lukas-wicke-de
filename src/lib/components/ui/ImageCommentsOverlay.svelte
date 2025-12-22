@@ -199,9 +199,24 @@
 </script>
 
 <!-- Overlay inside Gallery's absolute inset-0 container -->
-<div class="flex h-full flex-col justify-between p-2">
+<div 
+	class="flex flex-col-reverse h-full flex-grow justify-between p-2 cursor-pointer"
+		onclick={(e) => {
+			e.stopPropagation();
+			openFullscreen();
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.stopPropagation();
+				openFullscreen();
+			}
+		}}
+	aria-label="Open fullscreen"
+	role="button"
+	tabindex="0"
+>
 	<!-- Top: fullscreen button -->
-	<div class="flex justify-end">
+	<!-- <div class="flex justify-end">
 		<Button
 			variant="ghost"
 			class="h-7 w-7 cursor-pointer rounded-full"
@@ -213,7 +228,7 @@
 		>
 			<IExpand class="h-4 w-4" />
 		</Button>
-	</div>
+	</div> -->
 
 	<!-- Bottom: comment button with count -->
 	<div class="flex justify-end">

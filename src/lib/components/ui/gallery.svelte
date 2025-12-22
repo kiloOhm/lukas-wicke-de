@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { GalleryItemInfo } from '../../../types';
+	import type { GalleryImage, GalleryItemInfo } from '../../../types';
 
 	const EAGER_LOAD_COUNT = 4;
 	const BLANK_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
@@ -9,16 +9,6 @@
 	// - medium: half width
 	// - large: ~third of viewport
 	const RESPONSIVE_SIZES = '(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 33vw';
-
-	// Allow optional href + the srcset variants
-	type GalleryImage = GalleryItemInfo & {
-		href?: string;
-		src400: string;
-		src800: string;
-		src1440: string;
-		src4k: string;
-		src8k: string;
-	};
 
 	const { images, extra }: { images: GalleryImage[]; extra?: any } = $props();
 

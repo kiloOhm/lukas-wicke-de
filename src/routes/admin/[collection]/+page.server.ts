@@ -1,6 +1,6 @@
 import { error, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { ImageInfo } from '../../../types';
+import type { GalleryImage, ImageInfo } from '../../../types';
 import { useCloudflareImagesService } from '../../../server/cloudflare.service';
 import type { GalleryItemInfo } from '../../../types';
 import { validateRequest } from './common';
@@ -8,20 +8,42 @@ import { validateRequest } from './common';
 export const load: PageServerLoad = async (event) => {
 	const { collection, platform } = await validateRequest(event);
 	const { getSignedUrl } = useCloudflareImagesService(platform!);
+
+	const images: GalleryImage[] =
+		(await Promise.all(
+			collection.images.map(async (image) => {
+				const [url400, url800, url1440, url4k, url8k] = await Promise.all([
+					getSignedUrl(image.id, 'private400'),
+					getSignedUrl(image.id, 'private800'),
+					getSignedUrl(image.id, 'private1440'),
+					getSignedUrl(image.id, 'private4k'),
+					getSignedUrl(image.id, 'private8k')
+				]);
+
+				return {
+					alt: image.alt,
+					src: url1440.href,
+					id: image.id,
+					width: image.width,
+					height: image.height,
+					src400: url400.href,
+					src800: url800.href,
+					src1440: url1440.href,
+					src4k: url4k.href,
+					src8k: url8k.href
+				} as GalleryItemInfo & {
+					src400: string;
+					src800: string;
+					src1440: string;
+					src4k: string;
+					src8k: string;
+				};
+			})
+		)) ?? [];
+
 	return {
 		collection,
-		images: await Promise.all(
-			collection.images.map(
-				async (img) =>
-					({
-						src: (await getSignedUrl(img.id, 'private1440')).href,
-						alt: img.alt,
-						id: img.id,
-						width: img.width,
-						height: img.height
-					}) as GalleryItemInfo
-			)
-		)
+		images,
 	};
 };
 

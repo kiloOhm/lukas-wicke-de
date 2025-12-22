@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { CollectionInfo, GalleryItemInfo } from '../../../types';
+import type { CollectionInfo, GalleryItemInfo, GalleryImage } from '../../../types';
 import { useCloudflareImagesService } from '../../../server/cloudflare.service';
 import { createDb } from '../../../server/db/client';
 import { getCommentCountsForCollection } from '../../../server/comments.service';
@@ -24,13 +24,7 @@ export const load: PageServerLoad = async ({ url, platform, params, cookies }) =
 	}
 	const { getSignedUrl } = useCloudflareImagesService(platform);
 
-	const images: (GalleryItemInfo & {
-		src400: string;
-		src800: string;
-		src1440: string;
-		src4k: string;
-		src8k: string;
-	})[] =
+	const images: GalleryImage[] =
 		(await Promise.all(
 			collection.images.map(async (image) => {
 				const [url400, url800, url1440, url4k, url8k] = await Promise.all([

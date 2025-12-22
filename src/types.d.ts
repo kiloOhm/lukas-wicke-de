@@ -21,3 +21,12 @@ export type CollectionInfo = {
   images: ImageInfo[]
   thumb?: string;
 }
+
+export type GalleryImage = GalleryItemInfo & {
+  href?: string;
+  src400: string;
+  src800: string;
+  src1440: string;
+  src4k: string;
+  src8k: string;
+};

@@ -422,7 +422,7 @@
 		</Button>
 		<h1 class="text-xl font-semibold">{data.collection.name}</h1>
 		<div class="flex items-center gap-2">
-			<Button class="cursor-pointer" variant="outline" onclick={remeasureAll}>Re-measure</Button>
+			<!-- <Button class="cursor-pointer" variant="outline" onclick={remeasureAll}>Re-measure</Button>
 			<Dialog.Root bind:open={remeasuring}>
 				<Dialog.Content
 					escapeKeydownBehavior="ignore"
@@ -450,7 +450,7 @@
 						{/each}
 					</div>
 				</Dialog.Content>
-			</Dialog.Root>
+			</Dialog.Root> -->
 			<Button class="cursor-pointer" onclick={pickFiles}>
 				{#if uploading}
 					<div class="contents" transition:fade>
