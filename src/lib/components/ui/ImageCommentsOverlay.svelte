@@ -30,7 +30,7 @@
 	const NAME_LS_KEY = 'gallery_comment_name';
 
 	let comments = $state<Comment[] | null>(null);
-	let commentCount = $state(initialCount);
+	let commentCount = $derived(comments?.length ?? initialCount);
 	let loading = $state(false);
 	let loadError = $state<string | null>(null);
 	let showModal = $state(false);
@@ -38,7 +38,6 @@
 
 	let posting = $state(false);
 
-	// Name-related state
 	let username = $state<string | null>(null);
 	let nameInput = $state('');
 	let showNameDialog = $state(false);
@@ -200,7 +199,7 @@
 
 <!-- Overlay inside Gallery's absolute inset-0 container -->
 <div 
-	class="flex flex-col-reverse h-full flex-grow justify-between p-2 cursor-pointer"
+	class="flex flex-col-reverse h-full grow justify-between p-2 cursor-pointer"
 		onclick={(e) => {
 			e.stopPropagation();
 			openFullscreen();
@@ -215,22 +214,6 @@
 	role="button"
 	tabindex="0"
 >
-	<!-- Top: fullscreen button -->
-	<!-- <div class="flex justify-end">
-		<Button
-			variant="ghost"
-			class="h-7 w-7 cursor-pointer rounded-full"
-			onclick={(e) => {
-				e.stopPropagation();
-				openFullscreen();
-			}}
-			aria-label="Open fullscreen"
-		>
-			<IExpand class="h-4 w-4" />
-		</Button>
-	</div> -->
-
-	<!-- Bottom: comment button with count -->
 	<div class="flex justify-end">
 		<Button
 			variant="ghost"
@@ -251,7 +234,7 @@
 </div>
 
 <Dialog.Root bind:open={showModal}>
-	<Dialog.Content class="box-border max-h-[100vh]! max-w-[90vw]! overflow-y-auto">
+	<Dialog.Content class="box-border max-h-screen! max-w-[90vw]! overflow-y-auto">
 		<Dialog.Header>
 			<Dialog.Title>Comments</Dialog.Title>
 			<Dialog.Description>
@@ -262,7 +245,7 @@
 
 		<div class="flex max-h-[80vh] flex-col gap-3">
 			<!-- Image on top -->
-			<div class="max-h-[30vh] w-full flex-shrink-0 overflow-hidden rounded-md bg-black">
+			<div class="max-h-[30vh] w-full shrink-0 overflow-hidden rounded-md bg-black">
 				<img src={info.src} alt={info.alt} class="mx-auto max-h-[30vh] w-auto object-contain" />
 			</div>
 
@@ -273,7 +256,7 @@
 					submitComment();
 				}}
 			>
-				<div class="flex-grow">
+				<div class="grow">
 					<Input placeholder="Add a comment..." bind:value={newCommentText} />
 				</div>
 				<Button

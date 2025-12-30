@@ -13,7 +13,11 @@
 	import type { GalleryItemInfo } from '../../../types';
 	import IDelete from '$lib/components/icons/i-delete.svelte';
 	import IBack from '$lib/components/icons/i-back.svelte';
+	import ImageCommentsOverlay from '$lib/components/ui/ImageCommentsOverlay.svelte';
+	import Separator from '$lib/components/ui/separator/separator.svelte';
 	const { data } = $props() as PageProps;
+
+	const commentCounts = $derived(data.commentCounts ?? {});
 
 	/** Run async work over a list with a max number of concurrent workers. */
 	async function mapWithConcurrency<T, R>(
@@ -45,6 +49,7 @@
 	}
 
 	let settingsDialogOpen = $state(false);
+	let deleteConfirmDialogOpen = $state(false);
 	let gettingUploadTickets = $state(false);
 	let uploading = $state(false);
 	let deleting = $state<string | null>(null);
@@ -320,99 +325,6 @@
 		}
 	}
 
-	let remeasuring = $state(false);
-	let remeasureMap = $state<
-		Record<
-			string,
-			{ loaded: number; total: number; status: 'measuring' | 'saving' | 'done' | 'error' }
-		>
-	>({});
-	async function remeasureAll() {
-		remeasuring = true;
-		remeasureMap = {};
-
-		// Use the already-loaded list with signed URLs
-		const items = [...data.images] as Array<Pick<GalleryItemInfo, 'id' | 'src'>>;
-
-		const measureOne = async (id: string, url: string) => {
-			remeasureMap[id] = { loaded: 0, total: 1, status: 'measuring' };
-
-			try {
-				// Fetch as blob so we can EXIF-correct via createImageBitmap
-				const res = await fetch(url, { credentials: 'omit' });
-				if (!res.ok) throw new Error(`HTTP ${res.status}`);
-				const blob = await res.blob();
-
-				let width: number, height: number;
-
-				if ('createImageBitmap' in window) {
-					const bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' as const });
-					width = bmp.width;
-					height = bmp.height;
-					bmp.close?.();
-				} else {
-					// Fallback: may ignore EXIF in some browsers
-					const objectUrl = URL.createObjectURL(blob);
-					try {
-						({ width, height } = await new Promise<{ width: number; height: number }>(
-							(resolve, reject) => {
-								const img = new Image();
-								img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-								img.onerror = reject;
-								img.src = objectUrl;
-							}
-						));
-					} finally {
-						URL.revokeObjectURL(objectUrl);
-					}
-				}
-
-				remeasureMap[id].loaded = 1; // show 100%
-				remeasureMap[id].status = 'saving';
-				return { id, width, height };
-			} catch (e) {
-				remeasureMap[id].status = 'error';
-				return null;
-			}
-		};
-
-		const CONCURRENCY = 3;
-
-		const measured = (
-			await mapWithConcurrency(items, CONCURRENCY, async ({ id, src }) => {
-				return await measureOne(id, src); // returns {id,width,height} | null
-			})
-		).filter((m): m is { id: string; width: number; height: number } => m !== null);
-
-		// Save results in one request
-		if (measured.length) {
-			const fd = new FormData();
-			fd.append('items', JSON.stringify(measured));
-			const res = await fetch(`./${data.collection.name.toLowerCase()}/remeasure`, {
-				method: 'POST',
-				body: fd
-			});
-			if (!res.ok) {
-				// mark all saving as error
-				for (const m of measured) remeasureMap[m.id].status = 'error';
-				toast.error('Failed to save new dimensions', { position: 'top-left' });
-			} else {
-				const { updated, skipped } = (await res.json()) as { updated: number; skipped: number };
-				for (const m of measured) {
-					remeasureMap[m.id].status = 'done';
-				}
-				toast.success(`Re-measured ${updated}${skipped ? `, skipped ${skipped}` : ''}.`, {
-					position: 'top-left'
-				});
-				// Refresh the page so Gallery gets the new width/height
-				location.reload();
-			}
-		} else {
-			toast.message('No images could be measured.', { position: 'top-left' });
-		}
-
-		remeasuring = false;
-	}
 </script>
 
 <section class="flex flex-col gap-4">
@@ -422,35 +334,6 @@
 		</Button>
 		<h1 class="text-xl font-semibold">{data.collection.name}</h1>
 		<div class="flex items-center gap-2">
-			<!-- <Button class="cursor-pointer" variant="outline" onclick={remeasureAll}>Re-measure</Button>
-			<Dialog.Root bind:open={remeasuring}>
-				<Dialog.Content
-					escapeKeydownBehavior="ignore"
-					showCloseButton={false}
-					onInteractOutside={(e) => e.preventDefault()}
-				>
-					<Dialog.Header>
-						<Dialog.Title>Re-measuring images</Dialog.Title>
-					</Dialog.Header>
-					<div class="flex max-h-[60vh] flex-col gap-2 overflow-auto">
-						{#each Object.entries(remeasureMap) as [id, p]}
-							<div class="flex items-center gap-3">
-								<div class="w-40 truncate">{id}</div>
-								<div class="h-2 flex-1 rounded bg-gray-200">
-									<div
-										class="h-2 rounded bg-green-600"
-										style={`width:${p.total ? ((p.loaded / p.total) * 100).toFixed(1) : 0}%`}
-									></div>
-								</div>
-								<div class="w-24 text-sm capitalize">{p.status}</div>
-								{#if p.status === 'measuring' || p.status === 'saving'}
-									<Loader2Icon class="animate-spin" />
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</Dialog.Content>
-			</Dialog.Root> -->
 			<Button class="cursor-pointer" onclick={pickFiles}>
 				{#if uploading}
 					<div class="contents" transition:fade>
@@ -482,7 +365,6 @@
 							</div>
 						</Dialog.Title>
 					</Dialog.Header>
-
 					<div class="flex max-h-[60vh] flex-col gap-3 overflow-auto">
 						{#each Object.entries(progressMap) as [name, p]}
 							<div class="flex w-full flex-col gap-1">
@@ -559,21 +441,14 @@
 						/>
 						<Button class="cursor-pointer" type="submit">Update</Button>
 					</form>
-					<form
-						action="?/deleteCollection"
-						method="POST"
-						use:enhance={() => {
-							deletingCollection = true;
-							return async ({ result, update }) => {
-								if (result.status === 200) {
-									toast.success('Collection deleted successfully!', { position: 'top-left' });
-								}
-								deletingCollection = false;
-								update();
-							};
-						}}
-					>
-						<Button variant="destructive" class="w-min cursor-pointer" type="submit">
+					<Separator class="my-2"/>
+					<Dialog.Root bind:open={deleteConfirmDialogOpen}>
+						<Button 
+							variant="destructive" 
+							class="cursor-pointer" 
+							type="submit"
+							onclick={() => (deleteConfirmDialogOpen = true)}
+						>
 							{#if deletingCollection}
 								<div class="contents" transition:fade>
 									<Loader2Icon class="animate-spin" />
@@ -581,7 +456,31 @@
 							{/if}
 							Delete Collection
 						</Button>
-					</form>
+						<Dialog.Content>
+							<Dialog.Header>
+								<Dialog.Title>Confirm Deletion</Dialog.Title>
+							</Dialog.Header>
+							<p class="mb-4">Are you sure you want to delete this collection? This action cannot be undone.</p>
+							<form
+								action="?/deleteCollection"
+								method="POST"
+								use:enhance={() => {
+									deletingCollection = true;
+									return async ({ result, update }) => {
+										if (result.status === 200) {
+											toast.success('Collection deleted successfully!', { position: 'top-left' });
+										}
+										deletingCollection = false;
+										update();
+									};
+								}}
+							>
+								<Button variant="destructive" class="cursor-pointer w-full" type="submit">
+									I'm sure, delete collection
+								</Button>
+							</form>
+						</Dialog.Content>
+					</Dialog.Root>
 				</Dialog.Content>
 			</Dialog.Root>
 		</div>
@@ -616,6 +515,7 @@
 				<IDelete class="*:stroke-[#DDD]" />
 			</Button>
 		</form>
+		<ImageCommentsOverlay {info} collection={data.collection.name} initialCount={commentCounts[info.id] ?? 0} />
 	{/snippet}
 	<Gallery images={data.images} {extra} />
 </section>

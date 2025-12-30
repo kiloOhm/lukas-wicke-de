@@ -1,10 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { validateRequest } from '../common';
 import type { ImageInfo } from '../../../../types';
-import { useCloudflareImagesService } from '../../../../server/cloudflare.service';
+import { addImagesToCollection } from '../../../../server/collections.service';
+import { createDb } from '../../../../server/db/client';
 
 export const POST = async (event) => {
-  const { collections, collection, platform } = await validateRequest(event);
+  const { collection, platform } = await validateRequest(event);
   const fd = await event.request.formData();
 
   let items: Array<{ id: string; width?: number; height?: number }> = [];
@@ -21,9 +22,11 @@ export const POST = async (event) => {
     id: i.id, alt: i.id, width: i.width ?? 0, height: i.height ?? 0
   })) : ids.map(id => ({ id, alt: id, width: 0, height: 0 })));
 
-  collection.images.push(...toSave);
-  collections.splice(collections.findIndex(c => c.name === collection.name), 1, collection);
-  await platform?.env.KV.put('collections', JSON.stringify(collections));
+  await addImagesToCollection(
+    createDb(platform.env.DB),
+    collection.name,
+    toSave
+  );
 
   return json({ saved: toSave.length });
 };

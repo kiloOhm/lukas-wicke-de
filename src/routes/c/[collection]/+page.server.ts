@@ -4,15 +4,14 @@ import type { CollectionInfo, GalleryItemInfo, GalleryImage } from '../../../typ
 import { useCloudflareImagesService } from '../../../server/cloudflare.service';
 import { createDb } from '../../../server/db/client';
 import { getCommentCountsForCollection } from '../../../server/comments.service';
+import { getCollectionByName } from '../../../server/collections.service';
 
 export const load: PageServerLoad = async ({ url, platform, params, cookies }) => {
 	if (!platform) {
 		return error(500, 'Platform not available');
 	}
-	const collections = await platform.env.KV.get<CollectionInfo[]>('collections', { type: 'json' });
-	const collection = collections?.find(
-		(c) => c.name.toLowerCase() === params.collection.toLowerCase()
-	);
+	const db = createDb(platform.env.DB);
+	const collection = await getCollectionByName(db, params.collection!);
 	if (!collection) {
 		return error(404, 'Collection not found');
 	}
@@ -55,8 +54,6 @@ export const load: PageServerLoad = async ({ url, platform, params, cookies }) =
 				};
 			})
 		)) ?? [];
-
-	const db = createDb(platform.env.DB);
 	const commentCounts = await getCommentCountsForCollection(db, collection.name);
 
 	return {

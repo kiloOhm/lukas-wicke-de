@@ -1,75 +1,22 @@
 <script lang="ts">
+	import { onDestroy, onMount } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import type { GalleryImage, GalleryItemInfo } from '../../../types';
 
 	const EAGER_LOAD_COUNT = 4;
-	const BLANK_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+	const BLANK_IMAGE =
+		'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
-	// Roughly matches your masonry layout:
-	// - small screens: full width
-	// - medium: half width
-	// - large: ~third of viewport
+	// You can keep this as-is, or make it dynamic.
 	const RESPONSIVE_SIZES = '(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 33vw';
 
-	const { images, extra }: { images: GalleryImage[]; extra?: any } = $props();
+	// Masonry knobs (tweak to taste)
+	const TARGET_COLUMN_WIDTH = 400; // roughly matches your old minmax(400px, 1fr)
+	const GAP = 8;
+	const MAX_COLUMNS = 0; // 0 = no cap
 
-	// Svelte action: make grid-row span match the *rendered* height
-	function spanByAspect(node: HTMLElement) {
-		let ro: ResizeObserver | null = null;
-
-		const fig = node as HTMLElement; // the <figure>
-		const img = fig.querySelector('img') as HTMLImageElement | null;
-
-		function apply() {
-			const grid = fig.parentElement as HTMLElement;
-			if (!grid) return;
-
-			// 1) Read actual grid metrics so JS == CSS
-			const cs = getComputedStyle(grid);
-			const row = parseFloat(cs.gridAutoRows || '1'); // px
-			const gap = parseFloat(cs.rowGap || '0'); // px
-
-			// 2) Measure actual track width for this card
-			const colWidth = fig.clientWidth || fig.getBoundingClientRect().width || 1;
-
-			// 3) Get the intended aspect (prefer your --w/--h; fall back to actual image)
-			const w =
-				Number(fig.style.getPropertyValue('--w')) ||
-				Number(img?.getAttribute('width')) ||
-				(img?.naturalWidth ?? 1);
-
-			const h =
-				Number(fig.style.getPropertyValue('--h')) ||
-				Number(img?.getAttribute('height')) ||
-				(img?.naturalHeight ?? 1);
-
-			// 4) Target *rendered* height
-			const target = (h / w) * colWidth;
-
-			// 5) Convert to rows. Use ceil with a tiny epsilon to avoid off-by-one bumps.
-			//    height ≈ r*row + (r-1)*gap  =>  r = (height + gap) / (row + gap)
-			const span = Math.max(1, Math.ceil((target + gap) / (row + gap) - 0.001));
-
-			fig.style.gridRowEnd = `span ${span}`;
-		}
-
-		// Recompute when the grid/figure changes size…
-		ro = new ResizeObserver(apply);
-		ro.observe(fig);
-		if (fig.parentElement) ro.observe(fig.parentElement);
-
-		// …and once the image knows its real size.
-		if (img && !img.complete) {
-			img.addEventListener('load', apply, { once: true });
-		}
-
-		apply();
-
-		return {
-			destroy() {
-				ro?.disconnect();
-			}
-		};
-	}
+	const { images, extra }: { images: GalleryImage[]; extra?: Snippet<[{ info: GalleryItemInfo }]> } =
+		$props();
 
 	// IO-powered lazy: set src / srcset / sizes only when visible
 	type LazySrcParams =
@@ -87,25 +34,16 @@
 		let seen = false;
 
 		// prevent browser from showing alt text before we swap in the real src
-		if (!node.src) {
-			node.src = BLANK_IMAGE;
-		}
+		if (!node.src) node.src = BLANK_IMAGE;
 
 		function apply(p: LazySrcParams) {
 			if (typeof p === 'string') {
 				node.src = p;
 				return;
 			}
-
 			node.src = p.src;
-
-			if (p.srcset) {
-				node.srcset = p.srcset;
-			}
-
-			if (p.sizes) {
-				node.sizes = p.sizes;
-			}
+			if (p.srcset) node.srcset = p.srcset;
+			if (p.sizes) node.sizes = p.sizes;
 		}
 
 		const io = new IntersectionObserver(
@@ -127,121 +65,192 @@
 		return {
 			update(next: LazySrcParams) {
 				current = next;
-				if (seen) {
-					apply(current);
-				}
+				if (seen) apply(current);
 			},
 			destroy() {
 				io.disconnect();
 			}
 		};
 	}
+
+	// --- Balanced masonry layout ---
+	let container = $state<HTMLElement | null>(null);
+	let containerWidth = $state(0);
+	let ro: ResizeObserver | null = null;
+
+	onMount(() => {
+		if (!container) return;
+		ro = new ResizeObserver(([entry]) => (containerWidth = entry.contentRect.width));
+		ro.observe(container);
+	});
+
+	onDestroy(() => ro?.disconnect());
+
+	const columnCount = $derived(() => {
+		const w = containerWidth || 0;
+		if (w <= 0) return 1;
+
+		const raw = Math.max(1, Math.floor((w + GAP) / (TARGET_COLUMN_WIDTH + GAP)));
+		return MAX_COLUMNS && MAX_COLUMNS > 0 ? Math.min(raw, MAX_COLUMNS) : raw;
+	});
+
+	const actualColumnWidth = $derived(() => {
+		const n = columnCount();
+		const w = containerWidth || 0;
+		if (w <= 0) return TARGET_COLUMN_WIDTH;
+		const totalGap = GAP * (n - 1);
+		return Math.max(1, (w - totalGap) / n);
+	});
+
+	const columns = $derived(() => {
+		const n = columnCount();
+		const colW = actualColumnWidth();
+		const cols: { items: { img: GalleryImage; index: number }[]; h: number }[] = Array.from(
+			{ length: n },
+			() => ({ items: [], h: 0 })
+		);
+
+		for (let i = 0; i < (images?.length ?? 0); i++) {
+			const img = images[i];
+			const w = img.width || 1;
+			const h = img.height || 1;
+
+			const scaledH = (colW * h) / w;
+
+			// pick the currently shortest column
+			let target = 0;
+			for (let c = 1; c < n; c++) if (cols[c].h < cols[target].h) target = c;
+
+			cols[target].items.push({ img, index: i });
+			cols[target].h += scaledH + GAP;
+		}
+
+		return cols.map((c) => c.items);
+	});
+
+	function srcsetFor(img: GalleryImage) {
+		return `${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`;
+	}
 </script>
 
-<article aria-label="Photo gallery" class="masonry">
-	{#each images as img, i (img.id)}
-		<figure
-			class="card"
-			use:spanByAspect
-			style={`--w:${img.width};--h:${img.height}; aspect-ratio:${img.width}/${img.height};`}
-		>
-			{#if img.href}
-				<a
-					href={img.href}
-					rel="noreferrer noopener"
-					class="block"
-					aria-label={img.title ?? img.alt ?? 'Open image'}
+<article aria-label="Photo gallery" class="masonry" bind:this={container} style={`--gap:${GAP}px;`}>
+	{#each columns() as col, colIndex (colIndex)}
+		<div class="col">
+			{#each col as item (item.img.id)}
+				<figure
+					class="card"
+					style={`--w:${item.img.width};--h:${item.img.height}; aspect-ratio:${item.img.width}/${item.img.height};`}
 				>
-					{#if i < EAGER_LOAD_COUNT}
-						<!-- Eager-load first ... -->
-						<img
-							class="img"
-							alt={img.alt}
-							width={img.width}
-							height={img.height}
-							src={img.src1440}
-							srcset={`${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`}
-							sizes={RESPONSIVE_SIZES}
-							loading="eager"
-							decoding="async"
-							fetchpriority="high"
-						/>
+					{#if item.img.href}
+						<a
+							href={item.img.href}
+							rel="noreferrer noopener"
+							class="media"
+							aria-label={item.img.title ?? item.img.alt ?? 'Open image'}
+						>
+							{#if item.index < EAGER_LOAD_COUNT}
+								<img
+									class="img"
+									alt={item.img.alt}
+									width={item.img.width}
+									height={item.img.height}
+									src={item.img.src1440}
+									srcset={srcsetFor(item.img)}
+									sizes={RESPONSIVE_SIZES}
+									loading="eager"
+									decoding="async"
+									fetchpriority="high"
+								/>
+							{:else}
+								<img
+									class="img"
+									alt={item.img.alt}
+									width={item.img.width}
+									height={item.img.height}
+									src={BLANK_IMAGE}
+									use:lazySrc={{
+										src: item.img.src1440,
+										srcset: srcsetFor(item.img),
+										sizes: RESPONSIVE_SIZES
+									}}
+									loading="lazy"
+									decoding="async"
+								/>
+							{/if}
+						</a>
 					{:else}
-						<!-- Lazy-load the rest -->
-						<img
-							class="img"
-							alt={img.alt}
-							width={img.width}
-							height={img.height}
-							src={BLANK_IMAGE}
-							use:lazySrc={{
-								src: img.src1440,
-								srcset: `${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`,
-								sizes: RESPONSIVE_SIZES
-							}}
-							loading="lazy"
-							decoding="async"
-						/>
+						{#if item.index < EAGER_LOAD_COUNT}
+							<img
+								class="img"
+								alt={item.img.alt}
+								width={item.img.width}
+								height={item.img.height}
+								src={item.img.src1440}
+								srcset={srcsetFor(item.img)}
+								sizes={RESPONSIVE_SIZES}
+								loading="eager"
+								decoding="async"
+								fetchpriority="high"
+							/>
+						{:else}
+							<img
+								class="img"
+								alt={item.img.alt}
+								width={item.img.width}
+								height={item.img.height}
+								src={BLANK_IMAGE}
+								use:lazySrc={{
+									src: item.img.src1440,
+									srcset: srcsetFor(item.img),
+									sizes: RESPONSIVE_SIZES
+								}}
+								loading="lazy"
+								decoding="async"
+							/>
+						{/if}
 					{/if}
-				</a>
-			{:else if i < EAGER_LOAD_COUNT}
-				<img
-					class="img"
-					alt={img.alt}
-					width={img.width}
-					height={img.height}
-					src={img.src1440}
-					srcset={`${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`}
-					sizes={RESPONSIVE_SIZES}
-					loading="eager"
-					decoding="async"
-					fetchpriority="high"
-				/>
-			{:else}
-				<img
-					class="img"
-					alt={img.alt}
-					width={img.width}
-					height={img.height}
-					src={BLANK_IMAGE}
-					use:lazySrc={{
-						src: img.src1440,
-						srcset: `${img.src400} 400w, ${img.src800} 800w, ${img.src1440} 1440w, ${img.src4k} 3840w, ${img.src8k} 7680w`,
-						sizes: RESPONSIVE_SIZES
-					}}
-					loading="lazy"
-					decoding="async"
-				/>
-			{/if}
 
-			{#if extra}
-				<div class="absolute inset-0">
-					{@render extra({ info: img })}
-				</div>
-			{/if}
+					{#if extra}
+						<!-- overlay: lets the underlying link/image remain clickable -->
+						<div class="extra">
+							{@render extra({ info: item.img })}
+						</div>
+					{/if}
 
-			{#if img.title}
-				<!-- your existing figcaption -->
-			{/if}
-		</figure>
+					{#if item.img.title}
+						<!-- your existing figcaption -->
+					{/if}
+				</figure>
+			{/each}
+		</div>
 	{/each}
 </article>
 
 <style>
-	/* Grid container */
 	.masonry {
-		display: grid;
-		grid-auto-rows: 2px; /* the “row unit” */
-		gap: 8px; /* must match the JS ‘gap’ */
-		grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+		display: flex;
+		gap: var(--gap);
+		align-items: flex-start;
+		width: 100%;
 	}
 
-	/* Card */
+	.col {
+		flex: 1 1 0;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap);
+	}
+
 	.card {
 		position: relative;
 		overflow: hidden;
 		border-radius: 4px;
 		container-type: inline-size;
+	}
+
+	.media {
+		display: block;
 	}
 
 	.img {
@@ -250,9 +259,27 @@
 		height: auto;
 		object-fit: cover;
 		aspect-ratio: inherit;
-		/* These still help with rendering cost */
+
 		content-visibility: auto;
 		contain-intrinsic-size: 400px 300px;
 		font-size: 0px;
+	}
+
+	/* Overlay behaviour: doesn't block image/link clicks except on actual controls */
+	.extra {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		pointer-events: none;
+	}
+
+	.extra :global(button),
+	.extra :global(a),
+	.extra :global(input),
+	.extra :global(select),
+	.extra :global(textarea),
+	.extra :global(label),
+	.extra :global(form) {
+		pointer-events: auto;
 	}
 </style>

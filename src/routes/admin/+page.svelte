@@ -8,9 +8,17 @@
 	const { data } = $props() as PageProps;
 
 	let createDialogOpen = $state(false);
+	
 </script>
 
 <section class="grid grid-flow-row grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
+	<form
+		action="?/migrateCollections"
+		method="POST"
+		class="flex flex-col gap-2"
+	>
+		<Button class="w-full h-full" type="submit">Migrate collections to d1</Button>
+	</form>
 	<Dialog.Root bind:open={createDialogOpen}>
 		<Dialog.Trigger>
 			<button
@@ -58,14 +66,14 @@
 				{/if}
 				<div
 					class="
-						absolute inset-0 [mask-image:linear-gradient(to_top,black_30%,transparent)]
+						absolute inset-0 mask-[linear-gradient(to_top,black_30%,transparent)]
 						backdrop-blur-xs
 						[-webkit-mask-image:linear-gradient(to_top,black_30%,transparent)]
 					"
 				></div>
 
 				<!-- 2) Optional color tint on top of the blur -->
-				<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+				<div class="absolute inset-0 bg-linear-to-t from-black/60 to-transparent"></div>
 				<figcaption class="absolute inset-x-4 bottom-4 text-center text-xl font-semibold">
 					{collection.name}
 				</figcaption>

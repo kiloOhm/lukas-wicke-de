@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
-import type { RequestHandler } from '../$types';
 import { createDb } from '../../../../../server/db/client';
 import { getComments, addComment } from '../../../../../server/comments.service';
+import type { RequestHandler } from './$types';
 
 type RateLimitState = {
 	ts: number;

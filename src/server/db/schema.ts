@@ -20,7 +20,22 @@ export const imageCommentStats = sqliteTable(
 		imageId: text('image_id').notNull(),
 		commentCount: integer('comment_count').notNull().default(0)
 	},
-	(table) => ({
-		pk: primaryKey({ columns: [table.collection, table.imageId] })
-	})
+	(table) => ([
+		primaryKey({ columns: [table.collection, table.imageId] })
+	])
 );
+
+export const collections = sqliteTable('collections', {
+	name: text('name').primaryKey(),
+	password: text('password'),
+	thumb: text('thumb'),
+});
+
+export const images = sqliteTable('images', {
+	id: text('id').primaryKey(),
+	alt: text('alt').notNull(),
+	width: integer('width'),
+	height: integer('height'),
+	collection: text('collection').references(() => collections.name).notNull(),
+	position: integer('position').notNull().default(0)
+});

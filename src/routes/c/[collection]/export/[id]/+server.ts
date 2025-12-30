@@ -1,14 +1,14 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import type { CollectionInfo } from '../../../../../types';
 import { useCloudflareImagesService } from '../../../../../server/cloudflare.service';
+import { getCollectionByName } from '../../../../../server/collections.service';
+import { createDb } from '../../../../../server/db/client';
 
 export const GET: RequestHandler = async ({ params, cookies, platform, url }) => {
   if (!platform) {
     return error(500, "Platform not available");
   }
-  const collections = await platform.env.KV.get<CollectionInfo[]>("collections", { type: 'json' });
-  const collection = collections?.find(c => c.name.toLowerCase() === params.collection.toLowerCase());
+  const collection = await getCollectionByName(createDb(platform.env.DB), params.collection!);
   if (!collection) {
     return error(404, "Collection not found")
   }

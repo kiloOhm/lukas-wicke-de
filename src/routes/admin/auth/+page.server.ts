@@ -6,7 +6,12 @@ import { isAuthenticated } from '../../../server/auth.service';
 export const actions = {
   auth: async ({request, cookies, platform}) => {
     if(import.meta.env.DEV) {
-      platform?.env.KV.put('auth', JSON.stringify(['dev-password']));
+      let auth = await platform?.env.KV.get<string[]>('auth', { type: 'json' });
+      if(!auth) auth = [];
+      if(!auth.includes('dev-password')) {
+        auth.push('dev-password');
+      }
+      await platform?.env.KV.put('auth', JSON.stringify(auth));
     }
     const kvAuth = await platform?.env.KV.get<string[]>('auth', { type: 'json' });
     if(!platform) {

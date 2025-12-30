@@ -1,14 +1,18 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import type { CollectionInfo } from '../../../../types';
+import { getCollectionByName } from '../../../../server/collections.service';
+import { createDb } from '../../../../server/db/client';
 
 export const actions = {
   auth: async ({request, cookies, platform, params}) => {
     if(!platform) {
       return error(500, "Platform not available");
     }
-    const collections = await platform.env.KV.get<CollectionInfo[]>("collections", { type: 'json' });
-    const collection = collections?.find(c => c.name.toLowerCase() === params.collection.toLowerCase());
+    if(!params.collection) {
+      return error(400, "Collection not specified");
+    }
+    const collection = await getCollectionByName(createDb(platform.env.DB), params.collection!);
     if(!collection) {
       return error(404, "Collection not found")
     }
