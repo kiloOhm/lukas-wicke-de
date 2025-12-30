@@ -11,10 +11,33 @@ export type CommentDTO = {
 	name?: string | null;
 };
 
+export async function getNewCommentCountSince(
+	db: DbClient,
+	since: number,
+	collection?: string,
+	imageId?: string,
+): Promise<number> {
+	const countResult = await db
+		.select({
+			count: sql<number>`COUNT(*)`
+		})
+		.from(schema.comments)
+		.where(
+			and(
+				collection ? eq(schema.comments.collection, collection) : sql`1`,
+				imageId ? eq(schema.comments.imageId, imageId) : sql`1`,
+				sql`${schema.comments.createdAt} > ${new Date(since).toISOString()}`
+			)
+		)
+		.limit(1);
+
+	return countResult[0]?.count ?? 0;
+}
+
 export async function getComments(
 	db: DbClient,
-	collection: string,
-	imageId: string
+	collection?: string,
+	imageId?: string
 ): Promise<CommentDTO[]> {
 	const rows = await db
 		.select({
@@ -26,7 +49,12 @@ export async function getComments(
 			name: schema.comments.name
 		})
 		.from(schema.comments)
-		.where(and(eq(schema.comments.collection, collection), eq(schema.comments.imageId, imageId)))
+		.where(
+			and(
+				collection ? eq(schema.comments.collection, collection) : sql`1`,
+				imageId ? eq(schema.comments.imageId, imageId) : sql`1`
+			)
+		)
 		.orderBy(desc(schema.comments.createdAt));
 
 	return rows;

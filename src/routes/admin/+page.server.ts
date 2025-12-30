@@ -5,6 +5,7 @@ import { isAuthenticated } from '../../server/auth.service';
 import { useCloudflareImagesService } from '../../server/cloudflare.service';
 import { createDb } from '../../server/db/client';
 import { createCollection, getCollections, migrateCollections } from '../../server/collections.service';
+import { getNewCommentCountSince } from '../../server/comments.service';
 
 export const load: PageServerLoad = async ({platform, cookies}) => {
   if(!platform) {
@@ -21,8 +22,15 @@ export const load: PageServerLoad = async ({platform, cookies}) => {
       collection.thumb = (await getSignedUrl(collection.images[0].id, 'thumb')).href;
     }
   }
+
+  const lastTimeCommentsRead = await platform?.env.KV.get<number>('lastTimeCommentsRead', { type: 'json' }) ?? 0;
+  const newCommentsCount = await getNewCommentCountSince(
+    createDb(platform.env.DB),
+    lastTimeCommentsRead
+  );
   return {
-    collections
+    collections,
+    newCommentsCount
   };
 };
   

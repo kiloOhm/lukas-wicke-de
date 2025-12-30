@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import IMessage from '$lib/components/icons/i-message.svelte';
 	import IPlusCircle from '$lib/components/icons/i-plus-circle.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
@@ -11,6 +13,18 @@
 	
 </script>
 
+<header class="mb-6 flex items-center justify-between">
+	<h1 class="text-3xl font-bold">Collections</h1>
+	<Button href="/admin/feed">
+		<div class="flex items-center gap-2">
+			<IMessage/>
+			<span>Comments</span>
+			  {#if data.newCommentsCount > 0}
+					<Badge class="rounded-full px-2" variant="destructive">{data.newCommentsCount}</Badge>
+				{/if}
+		</div>
+	</Button>
+</header>
 <section class="grid grid-flow-row grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
 	<form
 		action="?/migrateCollections"

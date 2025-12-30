@@ -20,11 +20,15 @@
 	const {
 		info,
 		collection,
-		initialCount = 0
+		initialCount = 0,
+		noCount = false,
+		highlight = undefined,
 	}: {
 		info: GalleryItemInfo & { href?: string };
 		collection: string;
 		initialCount?: number;
+		noCount?: boolean;
+		highlight?: string;
 	} = $props();
 
 	const NAME_LS_KEY = 'gallery_comment_name';
@@ -225,10 +229,12 @@
 			}}
 			aria-label="Open comments"
 		>
-			<span aria-hidden="true" class="mr-1">
+			<span aria-hidden="true">
 				<IMessage class="h-4 w-4" />
 			</span>
-			<span>{commentCount}</span>
+			{#if !noCount}
+				<span class="ml-1">{commentCount}</span>
+			{/if}
 		</Button>
 	</div>
 </div>
@@ -290,7 +296,7 @@
 					<p class="text-xs text-destructive">Error: {loadError}</p>
 				{:else if comments && comments.length > 0}
 					{#each comments as comment (comment.id)}
-						<div class="rounded-md bg-neutral-900/60 p-2">
+						<div class="rounded-md bg-neutral-900/60 p-2" class:highlighted={highlight && comment.id === highlight}>
 							<div class="flex items-center justify-between text-[0.7rem] text-neutral-400">
 								<span>{comment.name ?? 'Guest'}</span>
 								<time datetime={comment.createdAt}>
@@ -342,3 +348,9 @@
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
+
+<style>
+	.highlighted {
+		background-color: rgba(251, 36, 36, 0.2);
+	}
+</style>
