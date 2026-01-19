@@ -20,15 +20,13 @@ export const imageCommentStats = sqliteTable(
 		imageId: text('image_id').notNull(),
 		commentCount: integer('comment_count').notNull().default(0)
 	},
-	(table) => ([
-		primaryKey({ columns: [table.collection, table.imageId] })
-	])
+	(table) => [primaryKey({ columns: [table.collection, table.imageId] })]
 );
 
 export const collections = sqliteTable('collections', {
 	name: text('name').primaryKey(),
 	password: text('password'),
-	thumb: text('thumb'),
+	thumb: text('thumb')
 });
 
 export const images = sqliteTable('images', {
@@ -36,6 +34,16 @@ export const images = sqliteTable('images', {
 	alt: text('alt').notNull(),
 	width: integer('width'),
 	height: integer('height'),
-	collection: text('collection').references(() => collections.name).notNull(),
+	collection: text('collection')
+		.references(() => collections.name)
+		.notNull(),
 	position: integer('position').notNull().default(0)
+});
+
+export const extraFiles = sqliteTable('extra_files', {
+	id: text('id').primaryKey(),
+	collection: text('collection')
+		.references(() => collections.name)
+		.notNull(),
+	name: text('name').notNull()
 });

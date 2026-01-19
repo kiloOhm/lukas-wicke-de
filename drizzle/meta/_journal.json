@@ -15,6 +15,20 @@
       "when": 1767101990087,
       "tag": "0001_parallel_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1767784801618,
+      "tag": "0002_plain_maelstrom",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1767785166457,
+      "tag": "0003_white_sunset_bain",
+      "breakpoints": true
     }
   ]
 }

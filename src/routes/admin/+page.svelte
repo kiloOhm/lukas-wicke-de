@@ -10,29 +10,21 @@
 	const { data } = $props() as PageProps;
 
 	let createDialogOpen = $state(false);
-	
 </script>
 
 <header class="mb-6 flex items-center justify-between">
 	<h1 class="text-3xl font-bold">Collections</h1>
 	<Button href="/admin/feed">
 		<div class="flex items-center gap-2">
-			<IMessage/>
+			<IMessage />
 			<span>Comments</span>
-			  {#if data.newCommentsCount > 0}
-					<Badge class="rounded-full px-2" variant="destructive">{data.newCommentsCount}</Badge>
-				{/if}
+			{#if data.newCommentsCount > 0}
+				<Badge class="rounded-full px-2" variant="destructive">{data.newCommentsCount}</Badge>
+			{/if}
 		</div>
 	</Button>
 </header>
 <section class="grid grid-flow-row grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
-	<form
-		action="?/migrateCollections"
-		method="POST"
-		class="flex flex-col gap-2"
-	>
-		<Button class="w-full h-full" type="submit">Migrate collections to d1</Button>
-	</form>
 	<Dialog.Root bind:open={createDialogOpen}>
 		<Dialog.Trigger>
 			<button

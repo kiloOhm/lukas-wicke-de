@@ -4,19 +4,22 @@
 	import type { GalleryImage, GalleryItemInfo } from '../../../types';
 
 	const EAGER_LOAD_COUNT = 4;
-	const BLANK_IMAGE =
-		'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+	const BLANK_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
-	// You can keep this as-is, or make it dynamic.
-	const RESPONSIVE_SIZES = '(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 33vw';
+	const imageSizes = $derived(() => {
+		const w = Math.max(1, Math.round(actualColumnWidth()));
+		return `${w}px`;
+	});
 
 	// Masonry knobs (tweak to taste)
 	const TARGET_COLUMN_WIDTH = 400; // roughly matches your old minmax(400px, 1fr)
 	const GAP = 8;
 	const MAX_COLUMNS = 0; // 0 = no cap
 
-	const { images, extra }: { images: GalleryImage[]; extra?: Snippet<[{ info: GalleryItemInfo }]> } =
-		$props();
+	const {
+		images,
+		extra
+	}: { images: GalleryImage[]; extra?: Snippet<[{ info: GalleryItemInfo }]> } = $props();
 
 	// IO-powered lazy: set src / srcset / sizes only when visible
 	type LazySrcParams =
@@ -154,9 +157,9 @@
 									alt={item.img.alt}
 									width={item.img.width}
 									height={item.img.height}
-									src={item.img.src1440}
+									src={item.img.src400}
 									srcset={srcsetFor(item.img)}
-									sizes={RESPONSIVE_SIZES}
+									sizes={imageSizes()}
 									loading="eager"
 									decoding="async"
 									fetchpriority="high"
@@ -169,45 +172,43 @@
 									height={item.img.height}
 									src={BLANK_IMAGE}
 									use:lazySrc={{
-										src: item.img.src1440,
+										src: item.img.src400,
 										srcset: srcsetFor(item.img),
-										sizes: RESPONSIVE_SIZES
+										sizes: imageSizes()
 									}}
 									loading="lazy"
 									decoding="async"
 								/>
 							{/if}
 						</a>
+					{:else if item.index < EAGER_LOAD_COUNT}
+						<img
+							class="img"
+							alt={item.img.alt}
+							width={item.img.width}
+							height={item.img.height}
+							src={item.img.src400}
+							srcset={srcsetFor(item.img)}
+							sizes={imageSizes()}
+							loading="eager"
+							decoding="async"
+							fetchpriority="high"
+						/>
 					{:else}
-						{#if item.index < EAGER_LOAD_COUNT}
-							<img
-								class="img"
-								alt={item.img.alt}
-								width={item.img.width}
-								height={item.img.height}
-								src={item.img.src1440}
-								srcset={srcsetFor(item.img)}
-								sizes={RESPONSIVE_SIZES}
-								loading="eager"
-								decoding="async"
-								fetchpriority="high"
-							/>
-						{:else}
-							<img
-								class="img"
-								alt={item.img.alt}
-								width={item.img.width}
-								height={item.img.height}
-								src={BLANK_IMAGE}
-								use:lazySrc={{
-									src: item.img.src1440,
-									srcset: srcsetFor(item.img),
-									sizes: RESPONSIVE_SIZES
-								}}
-								loading="lazy"
-								decoding="async"
-							/>
-						{/if}
+						<img
+							class="img"
+							alt={item.img.alt}
+							width={item.img.width}
+							height={item.img.height}
+							src={BLANK_IMAGE}
+							use:lazySrc={{
+								src: item.img.src400,
+								srcset: srcsetFor(item.img),
+								sizes: imageSizes()
+							}}
+							loading="lazy"
+							decoding="async"
+						/>
 					{/if}
 
 					{#if extra}

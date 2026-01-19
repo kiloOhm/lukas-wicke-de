@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { CollectionInfo, GalleryItemInfo, GalleryImage } from '../../../types';
+import type { GalleryItemInfo, GalleryImage } from '../../../types';
 import { useCloudflareImagesService } from '../../../server/cloudflare.service';
 import { createDb } from '../../../server/db/client';
 import { getCommentCountsForCollection } from '../../../server/comments.service';
@@ -22,6 +22,8 @@ export const load: PageServerLoad = async ({ url, platform, params, cookies }) =
 		return redirect(302, '/c/' + collection.name + '/auth');
 	}
 	const { getSignedUrl } = useCloudflareImagesService(platform);
+
+	const k = url.searchParams.get('k') ?? '';
 
 	const images: GalleryImage[] =
 		(await Promise.all(
@@ -60,6 +62,8 @@ export const load: PageServerLoad = async ({ url, platform, params, cookies }) =
 		authorized,
 		name: collection.name,
 		images,
-		commentCounts
+		commentCounts,
+		extraFiles: collection.extraFiles ?? [],
+		k
 	};
 };

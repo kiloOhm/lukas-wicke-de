@@ -1,12 +1,17 @@
 import { error, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { GalleryImage, ImageInfo } from '../../../types';
+import type { CollectionInfo, GalleryImage } from '../../../types';
 import { useCloudflareImagesService } from '../../../server/cloudflare.service';
 import type { GalleryItemInfo } from '../../../types';
 import { validateRequest } from './common';
 import { createDb } from '../../../server/db/client';
 import { getCommentCountsForCollection } from '../../../server/comments.service';
-import { deleteCollection, deleteImageFromCollection, updateCollection } from '../../../server/collections.service';
+import {
+	deleteCollection,
+	deleteExtraFile,
+	deleteImageFromCollection,
+	updateCollection
+} from '../../../server/collections.service';
 
 export const load: PageServerLoad = async (event) => {
 	const { collection, platform } = await validateRequest(event);
@@ -44,8 +49,8 @@ export const load: PageServerLoad = async (event) => {
 			})
 		)) ?? [];
 
-		const db = createDb(platform.env.DB);
-		const commentCounts = await getCommentCountsForCollection(db, collection.name);
+	const db = createDb(platform.env.DB);
+	const commentCounts = await getCommentCountsForCollection(db, collection.name);
 
 	return {
 		collection,
@@ -69,7 +74,13 @@ export const actions = {
 		const passwordStr = password instanceof Blob ? await password.text() : password;
 		collection.name = nameStr;
 		collection.password = passwordStr ?? undefined;
-		await updateCollection(createDb(platform.env.DB), originalName, collection);
+		const updated = await updateCollection(
+			createDb(platform.env.DB),
+			originalName,
+			collection,
+			true
+		);
+		return updated;
 	},
 	async delete(event) {
 		const { request } = event;
@@ -114,7 +125,25 @@ export const actions = {
 
 		console.log(`Failed to delete ${failed.length} images.`);
 
-		await deleteCollection(createDb(platform.env.DB), collection.name);
+		await deleteCollection(createDb(platform.env.DB), collection.name, platform.env.OBJ_STORAGE);
 		return redirect(302, '/admin');
+	},
+	async deleteExtra(event) {
+		const { request } = event;
+		const { collection, platform } = await validateRequest(event);
+		const fd = await request.formData();
+		const fileId = fd.get('fileId');
+		if (typeof fileId !== 'string') {
+			return error(400, 'fileId is required');
+		}
+
+		const db = createDb(platform.env.DB);
+		const bucket = platform.env.OBJ_STORAGE;
+
+		await deleteExtraFile(db, bucket, collection.name, fileId);
+		return {
+			...collection,
+			extraFiles: collection.extraFiles?.filter((f) => f.id !== fileId)
+		} as CollectionInfo;
 	}
 } satisfies Actions;
