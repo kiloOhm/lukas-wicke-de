@@ -5,13 +5,12 @@
   // computes grid-row span based on known aspect ratio + current column width
   function spanByAspect(node: HTMLElement, opts: { row: number; gap: number }) {
     let ro: ResizeObserver | null = null;
-    const figure = node; // the <figure>
-    const img = figure.querySelector('img') as HTMLImageElement | null;
+    const item = node;
+    const img = item.querySelector('img') as HTMLImageElement | null;
     const { row, gap } = opts;
 
     function apply() {
-      const card = figure; // figure’s grid item
-      const col = (card.parentElement as HTMLElement); // the grid container
+      const col = item.parentElement as HTMLElement | null;
       if (!col) return;
 
       // compute the current column width (first track’s width is fine for uniform grid)
@@ -21,16 +20,18 @@
       const colWidth = (col.clientWidth - (cols - 1) * gap) / cols;
 
       // pull intended intrinsic size (set below as CSS vars)
-      const w = Number(figure.style.getPropertyValue('--w') || img?.getAttribute('width') || 1);
-      const h = Number(figure.style.getPropertyValue('--h') || img?.getAttribute('height') || 1);
+      const w = Number(item.style.getPropertyValue('--w') || img?.getAttribute('width') || 1);
+      const h = Number(item.style.getPropertyValue('--h') || img?.getAttribute('height') || 1);
 
       const targetPxHeight = (h / w) * colWidth;
       const span = Math.ceil((targetPxHeight + gap) / (row + gap));
-      figure.style.gridRowEnd = `span ${span}`;
+      item.style.gridRowEnd = `span ${span}`;
     }
 
     ro = new ResizeObserver(apply);
-    ro.observe(figure.parentElement as Element);
+    if (item.parentElement) {
+      ro.observe(item.parentElement);
+    }
     apply();
 
     return {
@@ -71,9 +72,15 @@
   /* Card */
   .card {
     position: relative;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     border-radius: 4px;
     container-type: inline-size;
+  }
+
+  .tile {
+    display: block;
   }
 
   .img {
@@ -91,11 +98,16 @@
 <article aria-label="Photo gallery" class="masonry">
   {#each images as img, i}
     {#if img.href}
-      <a href={img.href} rel="noreferrer noopener">
+      <a
+        class="tile"
+        href={img.href}
+        rel="noreferrer noopener"
+        use:spanByAspect={{ row: 8, gap: 16 }}
+        style={`--w:${img.width};--h:${img.height};`}
+      >
         <figure
           class="card"
-          use:spanByAspect={{ row: 8, gap: 16 }}
-          style={`--w:${img.width};--h:${img.height}; aspect-ratio:${img.width}/${img.height};`}
+          style={`aspect-ratio:${img.width}/${img.height};`}
         >
           <img
             class="img"
