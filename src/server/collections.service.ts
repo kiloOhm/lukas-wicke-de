@@ -20,19 +20,19 @@ export async function getCollections(db: DbClient): Promise<CollectionInfo[]> {
 
 	const names = cols.map((c) => c.name);
 
-	// 2) All images for these collections (ordered per-collection by position desc)
+	// 2) All images for these collections
 	const imgs = await db
 		.select({
 			id: schema.images.id,
+			fileName: schema.images.fileName,
 			alt: schema.images.alt,
 			width: schema.images.width,
 			height: schema.images.height,
 			collection: schema.images.collection,
-			position: schema.images.position
 		})
 		.from(schema.images)
 		.where(inArray(schema.images.collection, names))
-		.orderBy(desc(schema.images.position));
+		.orderBy(desc(schema.images.fileName));
 
 	// 3) All extra files for these collections
 	const extras = await db
@@ -52,6 +52,7 @@ export async function getCollections(db: DbClient): Promise<CollectionInfo[]> {
 		}
 		imagesByCollection[img.collection].push({
 			id: img.id,
+			fileName: img.fileName,
 			alt: img.alt,
 			width: img.width || undefined,
 			height: img.height || undefined
@@ -110,13 +111,14 @@ export async function getCollectionByName(
 	const imgs = await db
 		.select({
 			id: schema.images.id,
+			fileName: schema.images.fileName,
 			alt: schema.images.alt,
 			width: schema.images.width,
 			height: schema.images.height
 		})
 		.from(schema.images)
 		.where(eq(schema.images.collection, actualName))
-		.orderBy(desc(schema.images.position));
+		.orderBy(desc(schema.images.fileName));
 
 	// 3) Extra files
 	const extras = await db
@@ -134,6 +136,7 @@ export async function getCollectionByName(
 		thumb: cols[0].thumb || undefined,
 		images: imgs.map((img) => ({
 			id: img.id,
+			fileName: img.fileName,
 			alt: img.alt,
 			width: img.width || undefined,
 			height: img.height || undefined
@@ -196,9 +199,10 @@ export async function updateCollection(
 				.select()
 				.from(schema.images)
 				.where(eq(schema.images.collection, collection.name))
-				.orderBy(desc(schema.images.position))
+				.orderBy(desc(schema.images.fileName))
 		).map((img) => ({
 			id: img.id,
+			fileName: img.fileName,
 			alt: img.alt,
 			width: img.width || undefined,
 			height: img.height || undefined
@@ -213,25 +217,17 @@ export async function updateCollection(
 export async function addImagesToCollection(
 	db: DbClient,
 	collectionName: string,
-	images: { id: string; alt: string; width?: number; height?: number }[]
+	images: { id: string; fileName: string; alt: string; width?: number; height?: number }[]
 ): Promise<void> {
-	const existingImages = await db
-		.select()
-		.from(schema.images)
-		.where(eq(schema.images.collection, collectionName))
-		.orderBy(desc(schema.images.position));
-
-	const maxPosition = existingImages.length > 0 ? existingImages[0].position : 0;
-
 	for (let i = 0; i < images.length; i++) {
 		const img = images[i];
 		await db.insert(schema.images).values({
 			id: img.id,
+			fileName: img.fileName,
 			alt: img.alt,
 			width: img.width,
 			height: img.height,
 			collection: collectionName,
-			position: maxPosition + i + 1
 		});
 	}
 }

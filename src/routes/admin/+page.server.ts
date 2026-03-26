@@ -6,6 +6,8 @@ import { useCloudflareImagesService } from '../../server/cloudflare.service';
 import { createDb } from '../../server/db/client';
 import { createCollection, getCollections } from '../../server/collections.service';
 import { getNewCommentCountSince } from '../../server/comments.service';
+import { images } from '../../server/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ platform, cookies }) => {
 	if (!platform) {
@@ -16,10 +18,49 @@ export const load: PageServerLoad = async ({ platform, cookies }) => {
 		return redirect(302, '/admin/auth');
 	}
 	const collections = (await getCollections(createDb(platform.env.DB))) ?? [];
-	const { getSignedUrl } = useCloudflareImagesService(platform);
+	const { getSignedUrl, getImageDetails } = useCloudflareImagesService(platform);
 	for (const collection of collections) {
 		if (collection.images.length > 0) {
 			collection.thumb = (await getSignedUrl(collection.images[0].id, 'thumb')).href;
+		}
+	}
+
+	// migrate all images
+	for (const collection of collections) {
+		for (const img of collection.images) {
+			if (!img.fileName || img.fileName.trim() === '') {
+				const details = await getImageDetails(img.id);
+				if (details) {
+					img.fileName = details.id;
+				} else {
+					img.fileName = img.id;
+				}
+			}
+		}
+	}
+	// check if there are any changes
+	let needsUpdate = false;
+	for (const collection of collections) {
+		for (const img of collection.images) {
+			if (!img.fileName || img.fileName.trim() === '') {
+				needsUpdate = true;
+				break;
+			}
+		}
+		if (needsUpdate) {
+			break;
+		}
+	}
+	if (needsUpdate) {
+		// update DB with new filenames
+		const db = createDb(platform.env.DB);
+		for (const collection of collections) {
+			for (const img of collection.images) {
+				await db
+					.update(images)
+					.set({ fileName: img.fileName })
+					.where(eq(images.id, img.id));
+			}
 		}
 	}
 

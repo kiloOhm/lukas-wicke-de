@@ -10,6 +10,7 @@ export type GalleryItemInfo = {
 
 export type ImageInfo = {
 	id: string;
+	fileName: string;
 	alt: string;
 	width?: number;
 	height?: number;

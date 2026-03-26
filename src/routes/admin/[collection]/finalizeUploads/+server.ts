@@ -8,7 +8,7 @@ export const POST = async (event) => {
   const { collection, platform } = await validateRequest(event);
   const fd = await event.request.formData();
 
-  let items: Array<{ id: string; width?: number; height?: number }> = [];
+  let items: Array<{ id: string; fileName: string; width?: number; height?: number }> = [];
   const itemsRaw = fd.get('items');
   if (typeof itemsRaw === 'string') {
     try { items = JSON.parse(itemsRaw); } catch {}
@@ -19,8 +19,12 @@ export const POST = async (event) => {
   const ids: string[] = typeof idsRaw === 'string' ? JSON.parse(idsRaw) : [];
 
   const toSave: ImageInfo[] = (items.length ? items.map(i => ({
-    id: i.id, alt: i.id, width: i.width ?? 0, height: i.height ?? 0
-  })) : ids.map(id => ({ id, alt: id, width: 0, height: 0 })));
+    id: i.id, 
+    fileName: i.fileName,
+    alt: i.fileName, 
+    width: i.width ?? 0, 
+    height: i.height ?? 0
+  })) : ids.map(id => ({ id, fileName: id, alt: id, width: 0, height: 0 })));
 
   await addImagesToCollection(
     createDb(platform.env.DB),

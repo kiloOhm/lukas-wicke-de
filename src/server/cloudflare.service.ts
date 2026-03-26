@@ -18,7 +18,7 @@ export function useCloudflareImagesService(platform: Readonly<App.Platform>) {
 			}
 			const json = (await res.json()) as {
 				success: boolean;
-				result: { id: string; width: number; height: number };
+				result: { id: string; filename: string; width: number; height: number };
 			};
 			return json.result;
 		},

@@ -31,13 +31,13 @@ export const collections = sqliteTable('collections', {
 
 export const images = sqliteTable('images', {
 	id: text('id').primaryKey(),
+	fileName: text('file_name').notNull().default(''),
 	alt: text('alt').notNull(),
 	width: integer('width'),
 	height: integer('height'),
 	collection: text('collection')
 		.references(() => collections.name)
 		.notNull(),
-	position: integer('position').notNull().default(0)
 });
 
 export const extraFiles = sqliteTable('extra_files', {

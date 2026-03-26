@@ -22,20 +22,10 @@ export const load: PageServerLoad = async ({ platform, cookies }) => {
 	const { getSignedUrl } = useCloudflareImagesService(platform);
 	const db = createDb(platform.env.DB);
 	const comments = await getComments(db);
-	const images = await db
-		.select()
-		.from(schema.images)
-		.where(
-			inArray(
-				schema.images.id,
-				comments.map((c) => c.imageId)
-			)
-		);
 	const commentsWithImages = await Promise.all(
 		comments.map(async (c) => ({
 			...c,
 			imgSrc: await getSignedUrl(c.imageId, 'private400'),
-			deleted: images.find((img) => img.id === c.imageId) === undefined
 		}))
 	);
 	return {
@@ -44,7 +34,7 @@ export const load: PageServerLoad = async ({ platform, cookies }) => {
 			createdAt: new Date(c.createdAt).toLocaleString(),
 			unread: new Date(c.createdAt) > new Date(lastTimeCommentsRead),
 			imgSrc: c.imgSrc,
-			imageDeleted: c.deleted
+			imageDeleted: c.imgDeleted
 		}))
 	};
 };

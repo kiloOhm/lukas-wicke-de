@@ -9,6 +9,7 @@ export type CommentDTO = {
 	text: string;
 	createdAt: string;
 	name?: string | null;
+	imgDeleted?: boolean;
 };
 
 export async function getNewCommentCountSince(
@@ -35,29 +36,43 @@ export async function getNewCommentCountSince(
 }
 
 export async function getComments(
-	db: DbClient,
-	collection?: string,
-	imageId?: string
+  db: DbClient,
+  collection?: string,
+  imageId?: string
 ): Promise<CommentDTO[]> {
-	const rows = await db
-		.select({
-			id: schema.comments.id,
-			collection: schema.comments.collection,
-			imageId: schema.comments.imageId,
-			text: schema.comments.text,
-			createdAt: schema.comments.createdAt,
-			name: schema.comments.name
-		})
-		.from(schema.comments)
-		.where(
-			and(
-				collection ? eq(schema.comments.collection, collection) : sql`1`,
-				imageId ? eq(schema.comments.imageId, imageId) : sql`1`
-			)
-		)
-		.orderBy(desc(schema.comments.createdAt));
+  const rows = await db
+    .select({
+      id: schema.comments.id,
+      collection: schema.comments.collection,
+      imageId: schema.comments.imageId,
+      text: schema.comments.text,
+      createdAt: schema.comments.createdAt,
+      name: schema.comments.name,
+      // Select the ID from the images table to check for existence
+      joinedImageId: schema.images.id, 
+    })
+    .from(schema.comments)
+    // Perform a LEFT JOIN on the image ID
+    .leftJoin(schema.images, eq(schema.comments.imageId, schema.images.id))
+    .where(
+      and(
+        collection ? eq(schema.comments.collection, collection) : sql`1`,
+        imageId ? eq(schema.comments.imageId, imageId) : sql`1`
+      )
+    )
+    .orderBy(desc(schema.comments.createdAt));
 
-	return rows;
+  // Map the results to the DTO, setting imgDeleted based on the join result
+  return rows.map((row) => ({
+    id: row.id,
+    collection: row.collection,
+    imageId: row.imageId,
+    text: row.text,
+    createdAt: row.createdAt,
+    name: row.name,
+    // If joinedImageId is null/undefined, the image was not found
+    imgDeleted: !row.joinedImageId, 
+  }));
 }
 
 export async function addComment(
