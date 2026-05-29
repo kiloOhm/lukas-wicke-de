@@ -26,7 +26,9 @@ export const load: PageServerLoad = async ({url, platform, params, cookies}) => 
 		images: await Promise.all(collection.images.map(async image => ({
 			alt: image.alt,
 			src: (await getSignedUrl(image.id, 'private1440')).href,
-      id: image.id
+      id: image.id,
+      width: image.width,
+      height: image.height
 		} as GalleryItemInfo))) ?? [],
 	};
 };

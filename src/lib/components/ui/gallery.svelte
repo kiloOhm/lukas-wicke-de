@@ -20,8 +20,10 @@
       const colWidth = (col.clientWidth - (cols - 1) * gap) / cols;
 
       // pull intended intrinsic size (set below as CSS vars)
-      const w = Number(item.style.getPropertyValue('--w') || img?.getAttribute('width') || 1);
-      const h = Number(item.style.getPropertyValue('--h') || img?.getAttribute('height') || 1);
+      const fallbackW = img?.naturalWidth || Number(img?.getAttribute('width')) || 1;
+      const fallbackH = img?.naturalHeight || Number(img?.getAttribute('height')) || 1;
+      const w = Number(item.style.getPropertyValue('--w')) || fallbackW;
+      const h = Number(item.style.getPropertyValue('--h')) || fallbackH;
 
       const targetPxHeight = (h / w) * colWidth;
       const span = Math.ceil((targetPxHeight + gap) / (row + gap));
@@ -32,10 +34,14 @@
     if (item.parentElement) {
       ro.observe(item.parentElement);
     }
+    img?.addEventListener('load', apply);
     apply();
 
     return {
-      destroy() { ro?.disconnect(); }
+      destroy() {
+        ro?.disconnect();
+        img?.removeEventListener('load', apply);
+      }
     };
   }
 
@@ -71,27 +77,21 @@
 
   /* Card */
   .card {
+    display: block;
     position: relative;
-    width: 100%;
-    height: 100%;
     overflow: hidden;
     border-radius: 4px;
     container-type: inline-size;
-  }
-
-  .tile {
-    display: block;
   }
 
   .img {
     display: block;
     width: 100%;
     height: auto;
-    object-fit: cover;
-    aspect-ratio: inherit;
-    /* These still help with rendering cost */
-    content-visibility: auto;
-    contain-intrinsic-size: 400px 300px;
+  }
+
+  .frame {
+    margin: 0;
   }
 </style>
 
@@ -99,16 +99,13 @@
   {#each images as img, i}
     {#if img.href}
       <a
-        class="tile"
+        class="card"
         href={img.href}
         rel="noreferrer noopener"
         use:spanByAspect={{ row: 8, gap: 16 }}
-        style={`--w:${img.width};--h:${img.height};`}
+        style={`--w:${img.width ?? ''};--h:${img.height ?? ''};${img.width && img.height ? ` aspect-ratio:${img.width}/${img.height};` : ''}`}
       >
-        <figure
-          class="card"
-          style={`aspect-ratio:${img.width}/${img.height};`}
-        >
+        <figure class="frame">
           <img
             class="img"
             alt={img.alt}
@@ -124,15 +121,15 @@
             </div>
           {/if}
           {#if img.title}
-            <figcaption class="pointer-events-none absolute inset-0"> 
+            <figcaption class="pointer-events-none absolute inset-0">
               <div class="absolute inset-0 [mask-image:linear-gradient(to_top,black_30%,transparent)] backdrop-blur-xs [-webkit-mask-image:linear-gradient(to_top,black_30%,transparent)]"></div>
-              <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div> 
-              <span class="sr-only">{img.title}</span> 
-              <svg aria-hidden="true" class="absolute inset-x-0 -bottom-[1.7rem] h-[8rem] w-full"> 
-                <text x="0" y="100%" dominant-baseline="ideographic" textLength="80%" lengthAdjust="spacingAndGlyphs" class="fill-white/30 [font-size:8rem] font-[700]"> 
-                  {img.title} 
-                </text> 
-              </svg> 
+              <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+              <span class="sr-only">{img.title}</span>
+              <svg aria-hidden="true" class="absolute inset-x-0 -bottom-[1.7rem] h-[8rem] w-full">
+                <text x="0" y="100%" dominant-baseline="ideographic" textLength="80%" lengthAdjust="spacingAndGlyphs" class="fill-white/30 [font-size:8rem] font-[700]">
+                  {img.title}
+                </text>
+              </svg>
             </figcaption>
           {/if}
         </figure>
@@ -141,7 +138,7 @@
       <figure
         class="card"
         use:spanByAspect={{ row: 8, gap: 16 }}
-        style={`--w:${img.width};--h:${img.height}; aspect-ratio:${img.width}/${img.height};`}
+        style={`--w:${img.width ?? ''};--h:${img.height ?? ''};${img.width && img.height ? ` aspect-ratio:${img.width}/${img.height};` : ''}`}
       >
         <img
           class="img"
