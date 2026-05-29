@@ -30,11 +30,11 @@ jobs:
         run: bun run build
 
       - name: Apply D1 migrations
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply ess-ridley-de --remote
+        run: bunx drizzle-kit migrate
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_DATABASE_ID: b90d0fc1-0d3d-41b5-9081-0e463e7fcf38
+          CLOUDFLARE_D1_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
