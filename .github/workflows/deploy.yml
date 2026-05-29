@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [ess]
   workflow_dispatch:
 
 concurrency:
