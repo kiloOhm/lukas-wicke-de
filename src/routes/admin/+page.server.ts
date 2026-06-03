@@ -25,42 +25,21 @@ export const load: PageServerLoad = async ({ platform, cookies }) => {
 		}
 	}
 
-	// migrate all images
-	for (const collection of collections) {
+	const MIGRATION_CAP = 20;
+	const migrated: { id: string; fileName: string }[] = [];
+	outer: for (const collection of collections) {
 		for (const img of collection.images) {
-			if (!img.fileName || img.fileName.trim() === '') {
-				const details = await getImageDetails(img.id);
-				if (details) {
-					img.fileName = details.id;
-				} else {
-					img.fileName = img.id;
-				}
-			}
+			if (img.fileName && img.fileName.trim() !== '') continue;
+			const details = await getImageDetails(img.id).catch(() => null);
+			img.fileName = details?.filename ?? img.id;
+			migrated.push({ id: img.id, fileName: img.fileName });
+			if (migrated.length >= MIGRATION_CAP) break outer;
 		}
 	}
-	// check if there are any changes
-	let needsUpdate = false;
-	for (const collection of collections) {
-		for (const img of collection.images) {
-			if (!img.fileName || img.fileName.trim() === '') {
-				needsUpdate = true;
-				break;
-			}
-		}
-		if (needsUpdate) {
-			break;
-		}
-	}
-	if (needsUpdate) {
-		// update DB with new filenames
+	if (migrated.length > 0) {
 		const db = createDb(platform.env.DB);
-		for (const collection of collections) {
-			for (const img of collection.images) {
-				await db
-					.update(images)
-					.set({ fileName: img.fileName })
-					.where(eq(images.id, img.id));
-			}
+		for (const { id, fileName } of migrated) {
+			await db.update(images).set({ fileName }).where(eq(images.id, id));
 		}
 	}
 
