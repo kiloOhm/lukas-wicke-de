@@ -26,21 +26,34 @@ export const load: PageServerLoad = async ({ platform, cookies }) => {
 	}
 
 	const MIGRATION_CAP = 20;
-	const migrated: { id: string; fileName: string }[] = [];
+	const toMigrate: string[] = [];
 	outer: for (const collection of collections) {
 		for (const img of collection.images) {
 			if (img.fileName && img.fileName.trim() !== '') continue;
-			const details = await getImageDetails(img.id).catch(() => null);
-			img.fileName = details?.filename ?? img.id;
-			migrated.push({ id: img.id, fileName: img.fileName });
-			if (migrated.length >= MIGRATION_CAP) break outer;
+			toMigrate.push(img.id);
+			if (toMigrate.length >= MIGRATION_CAP) break outer;
 		}
 	}
-	if (migrated.length > 0) {
+	if (toMigrate.length > 0) {
 		const db = createDb(platform.env.DB);
-		for (const { id, fileName } of migrated) {
-			await db.update(images).set({ fileName }).where(eq(images.id, id));
-		}
+		const startedAt = Date.now();
+		console.log(`[fileName migration] queued ${toMigrate.length} images: ${toMigrate.join(', ')}`);
+		platform.ctx.waitUntil(
+			Promise.all(
+				toMigrate.map(async (id) => {
+					const details = await getImageDetails(id).catch((err) => {
+						console.warn(`[fileName migration] ${id} fetch failed: ${err}`);
+						return null;
+					});
+					const fileName = details?.filename ?? id;
+					await db.update(images).set({ fileName }).where(eq(images.id, id));
+					console.log(`[fileName migration] ${id} -> ${fileName}${details ? '' : ' (fallback to id)'}`);
+				})
+			).then(
+				() => console.log(`[fileName migration] done in ${Date.now() - startedAt}ms`),
+				(err) => console.error(`[fileName migration] failed: ${err}`)
+			)
+		);
 	}
 
 	const lastTimeCommentsRead =
