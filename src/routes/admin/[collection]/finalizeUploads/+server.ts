@@ -18,13 +18,16 @@ export const POST = async (event) => {
   const idsRaw = fd.get('ids');
   const ids: string[] = typeof idsRaw === 'string' ? JSON.parse(idsRaw) : [];
 
-  const toSave: ImageInfo[] = (items.length ? items.map(i => ({
-    id: i.id, 
-    fileName: i.fileName,
-    alt: i.fileName, 
-    width: i.width ?? 0, 
-    height: i.height ?? 0
-  })) : ids.map(id => ({ id, fileName: id, alt: id, width: 0, height: 0 })));
+  const toSave: ImageInfo[] = (items.length ? items.map(i => {
+    const fileName = i.fileName?.trim() || i.id;
+    return {
+      id: i.id,
+      fileName,
+      alt: fileName,
+      width: i.width ?? 0,
+      height: i.height ?? 0
+    };
+  }) : ids.map(id => ({ id, fileName: id, alt: id, width: 0, height: 0 })));
 
   await addImagesToCollection(
     createDb(platform.env.DB),

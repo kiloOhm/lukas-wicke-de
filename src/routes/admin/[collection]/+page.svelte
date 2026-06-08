@@ -313,7 +313,7 @@
 
 				const dims = fileDims.get(name) ?? { width: 0, height: 0 };
 				const finFd = new FormData();
-				finFd.append('items', JSON.stringify([{ id, width: dims.width, height: dims.height }]));
+				finFd.append('items', JSON.stringify([{ id, fileName: name, width: dims.width, height: dims.height }]));
 
 				try {
 					const finRes = await fetch(`./${collection.name.toLowerCase()}/finalizeUploads`, {
